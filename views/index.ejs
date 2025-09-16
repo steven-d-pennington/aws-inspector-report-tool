@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Upload</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <ul class="nav-links">
+                <li><a href="/" class="active">Upload</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="upload-section">
+            <h2>Upload Vulnerability Report</h2>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <p>Drag and drop your JSON report here or click to browse</p>
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                    Choose File
+                </button>
+            </div>
+
+            <div id="fileInfo" class="file-info" style="display: none;">
+                <h3>Selected File:</h3>
+                <p id="fileName"></p>
+                <p id="fileSize"></p>
+                <button class="btn btn-success" onclick="uploadFile()">Upload Report</button>
+                <button class="btn btn-secondary" onclick="clearFile()">Clear</button>
+            </div>
+
+            <div id="uploadProgress" class="progress" style="display: none;">
+                <div class="progress-bar" id="progressBar"></div>
+                <p id="progressText">Uploading...</p>
+            </div>
+
+            <div id="uploadResult" class="result" style="display: none;">
+                <h3 id="resultTitle"></h3>
+                <p id="resultMessage"></p>
+                <div id="resultDetails"></div>
+                <button class="btn btn-primary" onclick="location.href='/dashboard'">View Dashboard</button>
+                <button class="btn btn-secondary" onclick="resetUpload()">Upload Another</button>
+            </div>
+        </div>
+
+        <div class="recent-reports">
+            <h2>Recent Reports</h2>
+            <div id="recentReportsList">Loading...</div>
+        </div>
+    </div>
+
+    <script src="/js/upload.js"></script>
+</body>
+</html>

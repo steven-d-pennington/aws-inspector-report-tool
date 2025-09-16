@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Vulnerabilities</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <ul class="nav-links">
+                <li><a href="/">Upload</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/vulnerabilities" class="active">Vulnerabilities</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="filters-section">
+            <h2>Filter Vulnerabilities</h2>
+            <form id="filterForm" method="get" action="/vulnerabilities">
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label for="search">Search</label>
+                        <input type="text" id="search" name="search" value="<%= filters.search || '' %>"
+                               placeholder="Search by title, description, CVE...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="severity">Severity</label>
+                        <select id="severity" name="severity">
+                            <option value="">All</option>
+                            <% if (filterOptions.severities) { %>
+                                <% filterOptions.severities.forEach(sev => { %>
+                                    <option value="<%= sev %>" <%= filters.severity === sev ? 'selected' : '' %>>
+                                        <%= sev %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status">
+                            <option value="">All</option>
+                            <% if (filterOptions.statuses) { %>
+                                <% filterOptions.statuses.forEach(stat => { %>
+                                    <option value="<%= stat %>" <%= filters.status === stat ? 'selected' : '' %>>
+                                        <%= stat %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="fixAvailable">Fix Available</label>
+                        <select id="fixAvailable" name="fixAvailable">
+                            <option value="">All</option>
+                            <option value="YES" <%= filters.fixAvailable === 'YES' ? 'selected' : '' %>>Yes</option>
+                            <option value="NO" <%= filters.fixAvailable === 'NO' ? 'selected' : '' %>>No</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resourceType">Resource Type</label>
+                        <select id="resourceType" name="resourceType">
+                            <option value="">All</option>
+                            <% if (filterOptions.resourceTypes) { %>
+                                <% filterOptions.resourceTypes.forEach(type => { %>
+                                    <option value="<%= type %>" <%= filters.resourceType === type ? 'selected' : '' %>>
+                                        <%= type %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="platform">Platform</label>
+                        <select id="platform" name="platform">
+                            <option value="">All</option>
+                            <% if (filterOptions.platforms) { %>
+                                <% filterOptions.platforms.forEach(plat => { %>
+                                    <option value="<%= plat %>" <%= filters.platform === plat ? 'selected' : '' %>>
+                                        <%= plat %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="vulnerabilityId">Vulnerability ID</label>
+                        <input type="text" id="vulnerabilityId" name="vulnerabilityId"
+                               value="<%= filters.vulnerabilityId || '' %>" placeholder="CVE-2024-...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resourceId">Resource ID</label>
+                        <input type="text" id="resourceId" name="resourceId"
+                               value="<%= filters.resourceId || '' %>" placeholder="i-0b5377c84c5f4696a">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="groupByCVE">Group by CVE</label>
+                        <select id="groupByCVE" name="groupByCVE">
+                            <option value="false" <%= !groupByCVE ? 'selected' : '' %>>Individual Findings</option>
+                            <option value="true" <%= groupByCVE ? 'selected' : '' %>>Group by CVE</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+                    <button type="button" class="btn btn-info" onclick="selectAll()">Select All</button>
+                    <button type="button" class="btn btn-info" onclick="deselectAll()">Deselect All</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="results-section">
+            <div class="results-header">
+                <h2>Results (<%= vulnerabilities.length %> vulnerabilities)</h2>
+                <div class="export-buttons">
+                    <button class="btn btn-success" onclick="exportPDF()" id="exportPdfBtn" disabled>
+                        Export to PDF (<span id="selectedCount">0</span> selected)
+                    </button>
+                    <button class="btn btn-info" onclick="exportNotion()" id="exportNotionBtn" disabled>
+                        Export for Notion (<span id="selectedCount2">0</span> selected)
+                    </button>
+                </div>
+            </div>
+
+            <div class="vulnerabilities-list">
+                <% if (vulnerabilities && vulnerabilities.length > 0) { %>
+                    <% vulnerabilities.forEach(vuln => { %>
+                        <div class="vulnerability-card <%= vuln.severity.toLowerCase() %>">
+                            <div class="vuln-header">
+                                <input type="checkbox" class="vuln-checkbox" value="<%= vuln.id %>" onchange="updateSelection()">
+                                <div class="vuln-title">
+                                    <h3><%= vuln.vulnerability_id || vuln.title %></h3>
+                                    <span class="severity-badge <%= vuln.severity.toLowerCase() %>"><%= vuln.severity %></span>
+                                    <% if (vuln.fix_available === 'YES') { %>
+                                        <span class="fix-badge">Fix Available</span>
+                                    <% } %>
+                                    <% if (groupByCVE && vuln.affected_resources_count) { %>
+                                        <span class="resources-badge"><%= vuln.affected_resources_count %> Resources</span>
+                                    <% } %>
+                                </div>
+                            </div>
+
+                            <div class="vuln-content">
+                                <p class="vuln-description"><%= vuln.description %></p>
+
+                                <div class="vuln-metadata">
+                                    <div class="metadata-item">
+                                        <strong>Status:</strong> <%= vuln.status %>
+                                    </div>
+                                    <div class="metadata-item">
+                                        <strong>CVSS Score:</strong> <%= vuln.inspector_score || 'N/A' %>
+                                    </div>
+                                    <% if (vuln.epss_score) { %>
+                                        <div class="metadata-item">
+                                            <strong>EPSS Score:</strong> <%= vuln.epss_score %>
+                                        </div>
+                                    <% } %>
+                                    <% if (!groupByCVE) { %>
+                                        <div class="metadata-item">
+                                            <strong>Resource Type:</strong> <%= vuln.resource_type || 'N/A' %>
+                                        </div>
+                                        <% if (vuln.platform) { %>
+                                            <div class="metadata-item">
+                                                <strong>Platform:</strong> <%= vuln.platform %>
+                                            </div>
+                                        <% } %>
+                                        <% if (vuln.resource_id) { %>
+                                            <div class="metadata-item">
+                                                <strong>Resource ID:</strong> <code><%= vuln.resource_id %></code>
+                                            </div>
+                                        <% } %>
+                                        <div class="metadata-item">
+                                            <strong>Last Observed:</strong> <%= new Date(vuln.last_observed_at).toLocaleDateString() %>
+                                        </div>
+                                    <% } else { %>
+                                        <div class="metadata-item">
+                                            <strong>Resource Types:</strong> <%= vuln.resource_types ? vuln.resource_types.join(', ') : 'N/A' %>
+                                        </div>
+                                        <% if (vuln.platforms && vuln.platforms.length > 0) { %>
+                                            <div class="metadata-item">
+                                                <strong>Platforms:</strong> <%= vuln.platforms.join(', ') %>
+                                            </div>
+                                        <% } %>
+                                    <% } %>
+                                </div>
+
+                                <% if (groupByCVE && vuln.resources && vuln.resources.length > 0) { %>
+                                    <div class="affected-resources-section">
+                                        <h4>Affected Resources (<%= vuln.resources.length %>):</h4>
+                                        <div class="resource-grid">
+                                            <% vuln.resources.forEach(resource => { %>
+                                                <div class="resource-item">
+                                                    <div class="resource-header">
+                                                        <code><%= resource.resource_id %></code>
+                                                        <span class="resource-type-badge"><%= resource.resource_type %></span>
+                                                    </div>
+                                                    <div class="resource-details">
+                                                        <% if (resource.platform) { %>
+                                                            <small><strong>Platform:</strong> <%= resource.platform %></small><br>
+                                                        <% } %>
+                                                        <% if (resource.region) { %>
+                                                            <small><strong>Region:</strong> <%= resource.region %></small><br>
+                                                        <% } %>
+                                                        <% if (resource.last_observed_at) { %>
+                                                            <small><strong>Last Observed:</strong> <%= new Date(resource.last_observed_at).toLocaleDateString() %></small><br>
+                                                        <% } %>
+                                                        <% if (resource.tags && Object.keys(resource.tags).length > 0) { %>
+                                                            <small><strong>Tags:</strong>
+                                                                <% Object.entries(resource.tags).slice(0, 2).forEach(([key, value]) => { %>
+                                                                    <span class="tag"><%= key %>: <%= value %></span>
+                                                                <% }) %>
+                                                                <% if (Object.keys(resource.tags).length > 2) { %>
+                                                                    <span class="more-tags">+<%= Object.keys(resource.tags).length - 2 %> more</span>
+                                                                <% } %>
+                                                            </small>
+                                                        <% } %>
+                                                    </div>
+                                                </div>
+                                            <% }) %>
+                                        </div>
+                                    </div>
+                                <% } %>
+
+                                <% if (vuln.packages && vuln.packages.length > 0) { %>
+                                    <div class="packages-section">
+                                        <h4>Affected Packages:</h4>
+                                        <ul class="package-list">
+                                            <% vuln.packages.forEach(pkg => { %>
+                                                <li>
+                                                    <code><%= pkg.name %>@<%= pkg.version %></code>
+                                                    <% if (pkg.fixed_version) { %>
+                                                        → <strong>Fixed in:</strong> <code><%= pkg.fixed_version %></code>
+                                                    <% } %>
+                                                    (<%= pkg.package_manager || 'Unknown' %>)
+                                                </li>
+                                            <% }) %>
+                                        </ul>
+                                    </div>
+                                <% } %>
+
+                                <% if (vuln.references && vuln.references.length > 0) { %>
+                                    <div class="references-section">
+                                        <h4>References:</h4>
+                                        <ul class="reference-list">
+                                            <% vuln.references.forEach(ref => { %>
+                                                <li><a href="<%= ref %>" target="_blank"><%= ref %></a></li>
+                                            <% }) %>
+                                        </ul>
+                                    </div>
+                                <% } %>
+
+                                <div class="vuln-dates">
+                                    <small>
+                                        First observed: <%= new Date(vuln.first_observed_at).toLocaleDateString() %> |
+                                        Last observed: <%= new Date(vuln.last_observed_at).toLocaleDateString() %>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="no-results">
+                        <p>No vulnerabilities found matching your filters.</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notion Export Modal -->
+    <div id="notionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Notion Export</h3>
+                <span class="close" onclick="closeNotionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Copy the text below and paste it into Notion:</p>
+                <textarea id="notionText" readonly></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="copyNotion()">Copy to Clipboard</button>
+                <button class="btn btn-secondary" onclick="closeNotionModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/vulnerabilities.js"></script>
+</body>
+</html>

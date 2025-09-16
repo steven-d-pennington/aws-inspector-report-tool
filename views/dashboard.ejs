@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Summary</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <ul class="nav-links">
+                <li><a href="/">Upload</a></li>
+                <li><a href="/dashboard" class="active">Dashboard</a></li>
+                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h2>Vulnerability Summary</h2>
+            <p>Last updated: <%= new Date().toLocaleString() %></p>
+        </div>
+
+        <div class="summary-cards">
+            <div class="summary-card total">
+                <div class="card-icon">📊</div>
+                <div class="card-content">
+                    <h3>Total Vulnerabilities</h3>
+                    <p class="card-value"><%= summary.total %></p>
+                </div>
+            </div>
+
+            <div class="summary-card critical">
+                <div class="card-icon">🔴</div>
+                <div class="card-content">
+                    <h3>Critical</h3>
+                    <p class="card-value"><%= summary.critical %></p>
+                </div>
+            </div>
+
+            <div class="summary-card high">
+                <div class="card-icon">🟠</div>
+                <div class="card-content">
+                    <h3>High</h3>
+                    <p class="card-value"><%= summary.high %></p>
+                </div>
+            </div>
+
+            <div class="summary-card medium">
+                <div class="card-icon">🟡</div>
+                <div class="card-content">
+                    <h3>Medium</h3>
+                    <p class="card-value"><%= summary.medium %></p>
+                </div>
+            </div>
+
+            <div class="summary-card low">
+                <div class="card-icon">🟢</div>
+                <div class="card-content">
+                    <h3>Low</h3>
+                    <p class="card-value"><%= summary.low %></p>
+                </div>
+            </div>
+
+            <div class="summary-card fixable">
+                <div class="card-icon">✅</div>
+                <div class="card-content">
+                    <h3>Fixable</h3>
+                    <p class="card-value"><%= summary.fixable %></p>
+                    <p class="card-subtitle"><%= summary.total > 0 ? Math.round(summary.fixable / summary.total * 100) : 0 %>% can be fixed</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h3>Quick Actions</h3>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="location.href='/vulnerabilities?severity=CRITICAL'">
+                    View Critical Vulnerabilities
+                </button>
+                <button class="btn btn-success" onclick="location.href='/vulnerabilities?fixAvailable=YES'">
+                    View Fixable Issues
+                </button>
+                <button class="btn btn-info" onclick="location.href='/vulnerabilities'">
+                    View All Vulnerabilities
+                </button>
+                <button class="btn btn-secondary" onclick="location.href='/'">
+                    Upload New Report
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <h3>Recent Reports</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Upload Date</th>
+                        <th>Account ID</th>
+                        <th>Vulnerabilities</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (recentReports && recentReports.length > 0) { %>
+                        <% recentReports.forEach(report => { %>
+                            <tr>
+                                <td><%= report.filename %></td>
+                                <td><%= new Date(report.upload_date).toLocaleString() %></td>
+                                <td><%= report.aws_account_id || 'N/A' %></td>
+                                <td><%= report.vulnerability_count %></td>
+                                <td>
+                                    <button class="btn btn-small btn-danger" onclick="deleteReport(<%= report.id %>)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="5" class="text-center">No reports uploaded yet</td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="dashboard-section">
+            <h3>Distribution by Severity</h3>
+            <div class="chart-container">
+                <canvas id="severityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const summary = <%- JSON.stringify(summary) %>;
+
+        // Create severity chart
+        const ctx = document.getElementById('severityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    data: [
+                        summary.critical,
+                        summary.high,
+                        summary.medium,
+                        summary.low
+                    ],
+                    backgroundColor: [
+                        '#e74c3c',
+                        '#e67e22',
+                        '#f39c12',
+                        '#27ae60'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        async function deleteReport(reportId) {
+            if (confirm('Are you sure you want to delete this report and all associated vulnerabilities?')) {
+                try {
+                    const response = await fetch(`/api/reports/${reportId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        alert('Report deleted successfully');
+                        location.reload();
+                    } else {
+                        alert('Error deleting report');
+                    }
+                } catch (error) {
+                    alert('Error deleting report: ' + error.message);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
