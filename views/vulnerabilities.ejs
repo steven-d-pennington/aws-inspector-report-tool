@@ -127,22 +127,28 @@
         <div class="results-section">
             <div class="results-header">
                 <h2>Results (<%= vulnerabilities.length %> vulnerabilities)</h2>
-                <div class="export-buttons">
-                    <button class="btn btn-success" onclick="exportPDF()" id="exportPdfBtn" disabled>
-                        Export to PDF (<span id="selectedCount">0</span> selected)
-                    </button>
-                    <button class="btn btn-info" onclick="exportNotion()" id="exportNotionBtn" disabled>
-                        Export for Notion (<span id="selectedCount2">0</span> selected)
-                    </button>
+                <div class="action-buttons">
+                    <% if (vulnerabilities.length > 0) { %>
+                        <button class="btn btn-secondary" onclick="expandAll()">Expand All</button>
+                        <button class="btn btn-secondary" onclick="collapseAll()">Collapse All</button>
+                    <% } %>
+                    <div class="export-buttons">
+                        <button class="btn btn-success" onclick="exportPDF()" id="exportPdfBtn" disabled>
+                            Export to PDF (<span id="selectedCount">0</span> selected)
+                        </button>
+                        <button class="btn btn-info" onclick="exportNotion()" id="exportNotionBtn" disabled>
+                            Export for Notion (<span id="selectedCount2">0</span> selected)
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <div class="vulnerabilities-list">
                 <% if (vulnerabilities && vulnerabilities.length > 0) { %>
-                    <% vulnerabilities.forEach(vuln => { %>
-                        <div class="vulnerability-card <%= vuln.severity.toLowerCase() %>">
-                            <div class="vuln-header">
-                                <input type="checkbox" class="vuln-checkbox" value="<%= vuln.id %>" onchange="updateSelection()">
+                    <% vulnerabilities.forEach((vuln, index) => { %>
+                        <div class="vulnerability-card <%= vuln.severity.toLowerCase() %> collapsed" data-card-id="<%= index %>">
+                            <div class="vuln-header" onclick="toggleCard(<%= index %>)">
+                                <input type="checkbox" class="vuln-checkbox" value="<%= vuln.id %>" onchange="updateSelection()" onclick="event.stopPropagation()">
                                 <div class="vuln-title">
                                     <h3><%= vuln.vulnerability_id || vuln.title %></h3>
                                     <span class="severity-badge <%= vuln.severity.toLowerCase() %>"><%= vuln.severity %></span>
@@ -151,6 +157,35 @@
                                     <% } %>
                                     <% if (groupByCVE && vuln.affected_resources_count) { %>
                                         <span class="resources-badge"><%= vuln.affected_resources_count %> Resources</span>
+                                    <% } %>
+                                </div>
+                                <div class="expand-icon">
+                                    <span class="arrow">▼</span>
+                                </div>
+                            </div>
+
+                            <div class="vuln-summary">
+                                <p class="vuln-description-short">
+                                    <%= vuln.description && vuln.description.length > 150 ?
+                                        vuln.description.substring(0, 150) + '...' :
+                                        vuln.description || 'No description available' %>
+                                </p>
+                                <div class="basic-metadata">
+                                    <span><strong>Status:</strong> <%= vuln.status %></span>
+                                    <span><strong>Score:</strong> <%= vuln.inspector_score || 'N/A' %></span>
+                                    <% if (!groupByCVE && vuln.resource_id) { %>
+                                        <span><strong>Resource:</strong>
+                                            <% if (vuln.resource_type === 'AWS_EC2_INSTANCE' && vuln.resource_id.startsWith('i-')) { %>
+                                                <a href="https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=<%= vuln.resource_id %>" target="_blank" class="instance-link">
+                                                    <code><%= vuln.resource_id %></code> 🔗
+                                                </a>
+                                            <% } else { %>
+                                                <code><%= vuln.resource_id %></code>
+                                            <% } %>
+                                        </span>
+                                    <% } %>
+                                    <% if (groupByCVE && vuln.affected_resources_count) { %>
+                                        <span><strong>Resources:</strong> <%= vuln.affected_resources_count %></span>
                                     <% } %>
                                 </div>
                             </div>
@@ -181,7 +216,14 @@
                                         <% } %>
                                         <% if (vuln.resource_id) { %>
                                             <div class="metadata-item">
-                                                <strong>Resource ID:</strong> <code><%= vuln.resource_id %></code>
+                                                <strong>Resource ID:</strong>
+                                                <% if (vuln.resource_type === 'AWS_EC2_INSTANCE' && vuln.resource_id.startsWith('i-')) { %>
+                                                    <a href="https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=<%= vuln.resource_id %>" target="_blank" class="instance-link">
+                                                        <code><%= vuln.resource_id %></code> 🔗
+                                                    </a>
+                                                <% } else { %>
+                                                    <code><%= vuln.resource_id %></code>
+                                                <% } %>
                                             </div>
                                         <% } %>
                                         <div class="metadata-item">
@@ -206,8 +248,16 @@
                                             <% vuln.resources.forEach(resource => { %>
                                                 <div class="resource-item">
                                                     <div class="resource-header">
-                                                        <code><%= resource.resource_id %></code>
-                                                        <span class="resource-type-badge"><%= resource.resource_type %></span>
+                                                        <% if (resource.resource_type === 'AWS_EC2_INSTANCE' && resource.resource_id.startsWith('i-')) { %>
+                                                            <a href="https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=<%= resource.resource_id %>" target="_blank" class="instance-link">
+                                                                <code><%= resource.resource_id %></code> 🔗
+                                                            </a>
+                                                            <span class="resource-type-badge"><%= resource.resource_type %></span>
+                                                        <% } else { %>
+                                                            <span class="resource-type-badge with-tooltip" title="<%= resource.resource_id %>">
+                                                                <%= resource.resource_type %>
+                                                            </span>
+                                                        <% } %>
                                                     </div>
                                                     <div class="resource-details">
                                                         <% if (resource.platform) { %>
@@ -275,7 +325,12 @@
                     <% }) %>
                 <% } else { %>
                     <div class="no-results">
-                        <p>No vulnerabilities found matching your filters.</p>
+                        <% if (!hasFilters) { %>
+                            <h3>🔍 Ready to Search</h3>
+                            <p>Use the filters above to search for vulnerabilities. Apply filters to view results.</p>
+                        <% } else { %>
+                            <p>No vulnerabilities found matching your filters.</p>
+                        <% } %>
                     </div>
                 <% } %>
             </div>

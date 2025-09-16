@@ -119,3 +119,31 @@ window.onclick = function(event) {
         closeNotionModal();
     }
 }
+
+// Expand/Collapse functionality
+function toggleCard(cardIndex) {
+    const card = document.querySelector(`[data-card-id="${cardIndex}"]`);
+    if (card.classList.contains('collapsed')) {
+        card.classList.remove('collapsed');
+        card.classList.add('expanded');
+    } else {
+        card.classList.remove('expanded');
+        card.classList.add('collapsed');
+    }
+}
+
+function expandAll() {
+    const cards = document.querySelectorAll('.vulnerability-card');
+    cards.forEach(card => {
+        card.classList.remove('collapsed');
+        card.classList.add('expanded');
+    });
+}
+
+function collapseAll() {
+    const cards = document.querySelectorAll('.vulnerability-card');
+    cards.forEach(card => {
+        card.classList.remove('expanded');
+        card.classList.add('collapsed');
+    });
+}

@@ -66,11 +66,16 @@ app.get('/vulnerabilities', async (req, res) => {
 
         const groupByCVE = req.query.groupByCVE === 'true';
 
-        let vulnerabilities;
-        if (groupByCVE) {
-            vulnerabilities = await db.getVulnerabilitiesGroupedByCVE(filters);
-        } else {
-            vulnerabilities = await db.getVulnerabilities(filters);
+        // Check if any filters are applied
+        const hasFilters = Object.values(filters).some(value => value && value.trim() !== '') || groupByCVE;
+
+        let vulnerabilities = [];
+        if (hasFilters) {
+            if (groupByCVE) {
+                vulnerabilities = await db.getVulnerabilitiesGroupedByCVE(filters);
+            } else {
+                vulnerabilities = await db.getVulnerabilities(filters);
+            }
         }
 
         const filterOptions = await db.getFilterOptions();
@@ -79,7 +84,8 @@ app.get('/vulnerabilities', async (req, res) => {
             vulnerabilities,
             filters,
             filterOptions,
-            groupByCVE: groupByCVE || false
+            groupByCVE: groupByCVE || false,
+            hasFilters
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
