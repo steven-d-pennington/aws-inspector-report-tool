@@ -25,54 +25,66 @@
         </div>
 
         <div class="summary-cards">
-            <div class="summary-card total">
-                <div class="card-icon">📊</div>
-                <div class="card-content">
-                    <h3>Total Vulnerabilities</h3>
-                    <p class="card-value"><%= summary.total %></p>
+            <a href="/vulnerabilities?groupByCVE=true" class="summary-card-link">
+                <div class="summary-card total">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <h3>Total Vulnerabilities</h3>
+                        <p class="card-value"><%= summary.total %></p>
+                    </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="summary-card critical">
-                <div class="card-icon">🔴</div>
-                <div class="card-content">
-                    <h3>Critical</h3>
-                    <p class="card-value"><%= summary.critical %></p>
+            <a href="/vulnerabilities?severity=CRITICAL&groupByCVE=true" class="summary-card-link">
+                <div class="summary-card critical">
+                    <div class="card-icon">🔴</div>
+                    <div class="card-content">
+                        <h3>Critical</h3>
+                        <p class="card-value"><%= summary.critical %></p>
+                    </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="summary-card high">
-                <div class="card-icon">🟠</div>
-                <div class="card-content">
-                    <h3>High</h3>
-                    <p class="card-value"><%= summary.high %></p>
+            <a href="/vulnerabilities?severity=HIGH&groupByCVE=true" class="summary-card-link">
+                <div class="summary-card high">
+                    <div class="card-icon">🟠</div>
+                    <div class="card-content">
+                        <h3>High</h3>
+                        <p class="card-value"><%= summary.high %></p>
+                    </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="summary-card medium">
-                <div class="card-icon">🟡</div>
-                <div class="card-content">
-                    <h3>Medium</h3>
-                    <p class="card-value"><%= summary.medium %></p>
+            <a href="/vulnerabilities?severity=MEDIUM&groupByCVE=true" class="summary-card-link">
+                <div class="summary-card medium">
+                    <div class="card-icon">🟡</div>
+                    <div class="card-content">
+                        <h3>Medium</h3>
+                        <p class="card-value"><%= summary.medium %></p>
+                    </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="summary-card low">
-                <div class="card-icon">🟢</div>
-                <div class="card-content">
-                    <h3>Low</h3>
-                    <p class="card-value"><%= summary.low %></p>
+            <a href="/vulnerabilities?severity=LOW&groupByCVE=true" class="summary-card-link">
+                <div class="summary-card low">
+                    <div class="card-icon">🟢</div>
+                    <div class="card-content">
+                        <h3>Low</h3>
+                        <p class="card-value"><%= summary.low %></p>
+                    </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="summary-card fixable">
-                <div class="card-icon">✅</div>
-                <div class="card-content">
-                    <h3>Fixable</h3>
-                    <p class="card-value"><%= summary.fixable %></p>
-                    <p class="card-subtitle"><%= summary.total > 0 ? Math.round(summary.fixable / summary.total * 100) : 0 %>% can be fixed</p>
+            <a href="/vulnerabilities?fixAvailable=YES&groupByCVE=true" class="summary-card-link">
+                <div class="summary-card fixable">
+                    <div class="card-icon">✅</div>
+                    <div class="card-content">
+                        <h3>Fixable</h3>
+                        <p class="card-value"><%= summary.fixable %></p>
+                        <p class="card-subtitle"><%= summary.total > 0 ? Math.round(summary.fixable / summary.total * 100) : 0 %>% can be fixed</p>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="dashboard-section">

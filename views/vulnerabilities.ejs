@@ -252,10 +252,12 @@
                                                             <a href="https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#InstanceDetails:instanceId=<%= resource.resource_id %>" target="_blank" class="instance-link">
                                                                 <code><%= resource.resource_id %></code> 🔗
                                                             </a>
+                                                            <span class="resource-type-badge"><%= resource.resource_type %></span>
                                                         <% } else { %>
-                                                            <code><%= resource.resource_id %></code>
+                                                            <span class="resource-type-badge with-tooltip" title="<%= resource.resource_id %>">
+                                                                <%= resource.resource_type %>
+                                                            </span>
                                                         <% } %>
-                                                        <span class="resource-type-badge"><%= resource.resource_type %></span>
                                                     </div>
                                                     <div class="resource-details">
                                                         <% if (resource.platform) { %>
