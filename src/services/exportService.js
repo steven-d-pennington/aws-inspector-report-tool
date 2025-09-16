@@ -279,54 +279,27 @@ class ExportService {
                     notionText += `> **${vuln.title}**\n`;
                     notionText += `> ${vuln.description || 'No description available'}\n\n`;
 
-                    // Metadata table
-                    notionText += '| Property | Value |\n';
-                    notionText += '|----------|-------|\n';
-                    notionText += `| Status | ${vuln.status} |\n`;
-                    notionText += `| Fix Available | ${vuln.fix_available === 'YES' ? '✅ Yes' : '❌ No'} |\n`;
-                    notionText += `| CVSS Score | ${vuln.inspector_score || 'N/A'} |\n`;
-                    notionText += `| Resource Type | ${vuln.resource_type || 'N/A'} |\n`;
-                    notionText += `| Platform | ${vuln.platform || 'N/A'} |\n`;
-
-                    if (vuln.resource_id) {
-                        notionText += `| Resource ID | \`${vuln.resource_id}\` |\n`;
+                    // Add CVE link if available
+                    if (vuln.vulnerability_id && vuln.vulnerability_id.startsWith('CVE-')) {
+                        notionText += `**🔗 CVE Report:** [${vuln.vulnerability_id}](https://nvd.nist.gov/vuln/detail/${vuln.vulnerability_id})\n\n`;
                     }
 
-                    notionText += '\n';
+                    // List affected instance IDs
+                    if (vuln.resources && vuln.resources.length > 0) {
+                        const instanceIds = vuln.resources
+                            .filter(resource => resource.resource_type === 'AWS_EC2_INSTANCE' && resource.resource_id.startsWith('i-'))
+                            .map(resource => resource.resource_id);
 
-                    // Affected packages
-                    if (vuln.packages && vuln.packages.length > 0) {
-                        notionText += '**Affected Packages:**\n';
-                        for (const pkg of vuln.packages) {
-                            notionText += `- \`${pkg.name}@${pkg.version}\``;
-                            if (pkg.fixed_version) {
-                                notionText += ` → **Fixed in:** \`${pkg.fixed_version}\``;
-                            }
-                            notionText += ` (${pkg.package_manager || 'Unknown'})\n`;
+                        if (instanceIds.length > 0) {
+                            notionText += `**🖥️ Affected Instances:**\n`;
+                            instanceIds.forEach(instanceId => {
+                                notionText += `- \`${instanceId}\`\n`;
+                            });
+                            notionText += '\n';
                         }
-                        notionText += '\n';
-                    }
-
-                    // Fix information
-                    if (vuln.fix_available === 'YES') {
-                        notionText += '**💡 Fix Available**\n';
-                        if (vuln.packages && vuln.packages.length > 0) {
-                            for (const pkg of vuln.packages) {
-                                if (pkg.fixed_version) {
-                                    notionText += `- Update \`${pkg.name}\` to version \`${pkg.fixed_version}\`\n`;
-                                }
-                            }
-                        }
-                        notionText += '\n';
-                    }
-
-                    // References
-                    if (vuln.references && vuln.references.length > 0) {
-                        notionText += '**📚 References:**\n';
-                        for (const ref of vuln.references) {
-                            notionText += `- [${this.shortenUrl(ref)}](${ref})\n`;
-                        }
-                        notionText += '\n';
+                    } else if (vuln.resource_id && vuln.resource_type === 'AWS_EC2_INSTANCE' && vuln.resource_id.startsWith('i-')) {
+                        // Handle individual findings (non-grouped)
+                        notionText += `**🖥️ Affected Instance:**\n- \`${vuln.resource_id}\`\n\n`;
                     }
 
                     notionText += '---\n\n';
@@ -334,54 +307,6 @@ class ExportService {
             }
         }
 
-        // Action items section
-        notionText += '## 📋 Recommended Actions\n\n';
-
-        const fixableVulns = vulnerabilities.filter(v => v.fix_available === 'YES');
-        if (fixableVulns.length > 0) {
-            notionText += `### ✅ Immediate Fixes Available (${fixableVulns.length} vulnerabilities)\n\n`;
-
-            const packageUpdates = new Map();
-            for (const vuln of fixableVulns) {
-                if (vuln.packages) {
-                    for (const pkg of vuln.packages) {
-                        if (pkg.fixed_version) {
-                            const key = `${pkg.name}|${pkg.package_manager}`;
-                            if (!packageUpdates.has(key)) {
-                                packageUpdates.set(key, {
-                                    name: pkg.name,
-                                    manager: pkg.package_manager,
-                                    versions: new Set(),
-                                    fixedVersion: pkg.fixed_version
-                                });
-                            }
-                            packageUpdates.get(key).versions.add(pkg.version);
-                        }
-                    }
-                }
-            }
-
-            if (packageUpdates.size > 0) {
-                notionText += '**Package Updates Required:**\n';
-                for (const [, pkg] of packageUpdates) {
-                    notionText += `- [ ] Update \`${pkg.name}\` to \`${pkg.fixedVersion}\` (${pkg.manager || 'Unknown'})\n`;
-                }
-                notionText += '\n';
-            }
-        }
-
-        const criticalHighVulns = vulnerabilities.filter(v =>
-            (v.severity === 'CRITICAL' || v.severity === 'HIGH') && v.fix_available !== 'YES'
-        );
-
-        if (criticalHighVulns.length > 0) {
-            notionText += `### ⚠️ Critical/High Vulnerabilities Without Fixes (${criticalHighVulns.length})\n\n`;
-            notionText += 'These vulnerabilities require alternative mitigation strategies:\n';
-            for (const vuln of criticalHighVulns) {
-                notionText += `- [ ] Review and mitigate: **${vuln.vulnerability_id || vuln.title}**\n`;
-            }
-            notionText += '\n';
-        }
 
         return notionText;
     }

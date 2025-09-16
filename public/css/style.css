@@ -386,13 +386,29 @@ body {
 .vulnerability-card {
     border: 1px solid #e0e0e0;
     border-radius: 10px;
-    padding: 20px;
     background: #fff;
     transition: all 0.3s;
+    overflow: hidden;
 }
 
 .vulnerability-card:hover {
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.vulnerability-card.collapsed .vuln-content {
+    display: none;
+}
+
+.vulnerability-card.expanded .vuln-summary {
+    display: none;
+}
+
+.vulnerability-card.collapsed {
+    padding: 15px;
+}
+
+.vulnerability-card.expanded {
+    padding: 20px;
 }
 
 .vulnerability-card.critical {
@@ -416,6 +432,12 @@ body {
     align-items: center;
     gap: 15px;
     margin-bottom: 15px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.vulnerability-card.collapsed .vuln-header {
+    margin-bottom: 0;
 }
 
 .vuln-checkbox {
@@ -724,4 +746,79 @@ code {
     color: #6c757d;
     font-style: italic;
     font-size: 0.75rem;
+}
+
+/* Expand/Collapse Functionality */
+.expand-icon {
+    margin-left: auto;
+    transition: transform 0.3s;
+}
+
+.vulnerability-card.expanded .expand-icon {
+    transform: rotate(180deg);
+}
+
+.arrow {
+    font-size: 1.2rem;
+    color: #666;
+}
+
+.vuln-summary {
+    padding-top: 15px;
+}
+
+.vuln-description-short {
+    color: #666;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+.basic-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.9rem;
+}
+
+.basic-metadata span {
+    color: #666;
+}
+
+.basic-metadata code {
+    font-size: 0.8rem;
+}
+
+/* Action buttons layout */
+.results-header .action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+/* Instance Links */
+.instance-link {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.instance-link:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.instance-link code {
+    color: inherit;
+    background: rgba(52, 152, 219, 0.1);
+    border: 1px solid rgba(52, 152, 219, 0.2);
+}
+
+.instance-link:hover code {
+    background: rgba(41, 128, 185, 0.15);
+    border-color: rgba(41, 128, 185, 0.3);
 }
