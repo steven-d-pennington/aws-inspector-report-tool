@@ -665,6 +665,368 @@ class Database {
             });
         });
     }
+
+    // ============================================================================
+    // HISTORY TRACKING METHODS
+    // ============================================================================
+
+    /**
+     * Archive current vulnerabilities to history tables before clearing them
+     * @param {number} reportId - Report ID that vulnerabilities came from
+     * @param {object} transaction - Optional transaction context
+     * @returns {Promise<number>} Count of archived records
+     */
+    async archiveVulnerabilities(reportId, transaction = null) {
+        return new Promise((resolve, reject) => {
+            const db = transaction || this.db;
+
+            // First, get count of current vulnerabilities to archive
+            db.get('SELECT COUNT(*) as count FROM vulnerabilities', [], (err, result) => {
+                if (err) return reject(err);
+
+                const archiveCount = result.count;
+
+                if (archiveCount === 0) {
+                    return resolve(0);
+                }
+
+                // Archive vulnerabilities to history table
+                db.run(`
+                    INSERT INTO vulnerability_history
+                    (finding_arn, vulnerability_id, title, severity, status, fix_available,
+                     inspector_score, first_observed_at, last_observed_at, archived_at,
+                     original_report_id, archived_from_report_id)
+                    SELECT
+                        finding_arn, vulnerability_id, title, severity, status, fix_available,
+                        inspector_score, first_observed_at, last_observed_at, CURRENT_TIMESTAMP,
+                        report_id, ?
+                    FROM vulnerabilities
+                `, [reportId], (err) => {
+                    if (err) return reject(err);
+
+                    // Archive associated resources
+                    db.run(`
+                        INSERT INTO resource_history
+                        (history_id, resource_id, resource_type, platform, archived_at)
+                        SELECT
+                            h.id, r.resource_id, r.resource_type, r.platform, CURRENT_TIMESTAMP
+                        FROM vulnerability_history h
+                        JOIN vulnerabilities v ON v.finding_arn = h.finding_arn
+                            AND h.archived_from_report_id = ?
+                        JOIN resources r ON r.vulnerability_id = v.id
+                    `, [reportId], (err) => {
+                        if (err) return reject(err);
+                        resolve(archiveCount);
+                    });
+                });
+            });
+        });
+    }
+
+    /**
+     * Get fixed vulnerabilities (those in history but not in current data)
+     * @param {object} filters - Filtering options
+     * @returns {Promise<array>} Array of fixed vulnerabilities with derived fields
+     */
+    async getFixedVulnerabilities(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let query = `
+                SELECT DISTINCT
+                    h.finding_arn,
+                    h.vulnerability_id,
+                    h.title,
+                    h.severity,
+                    h.status,
+                    h.fix_available,
+                    h.inspector_score,
+                    h.first_observed_at,
+                    h.last_observed_at,
+                    h.archived_at as fixed_date,
+                    CASE
+                        WHEN h.first_observed_at IS NOT NULL
+                        THEN ROUND((julianday(h.archived_at) - julianday(h.first_observed_at)))
+                        ELSE NULL
+                    END as days_active,
+                    CASE WHEN h.fix_available = 'YES' THEN 1 ELSE 0 END as fix_was_available,
+                    GROUP_CONCAT(DISTINCT rh.resource_id) as affected_resources,
+                    GROUP_CONCAT(DISTINCT rh.resource_type) as resource_types
+                FROM vulnerability_history h
+                LEFT JOIN resource_history rh ON rh.history_id = h.id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM vulnerabilities v
+                    WHERE v.finding_arn = h.finding_arn
+                       OR (v.vulnerability_id = h.vulnerability_id
+                           AND v.vulnerability_id IS NOT NULL
+                           AND h.vulnerability_id IS NOT NULL)
+                )
+            `;
+            const params = [];
+
+            if (filters.severity) {
+                query += ' AND h.severity = ?';
+                params.push(filters.severity);
+            }
+
+            if (filters.fixedAfter) {
+                query += ' AND h.archived_at >= ?';
+                params.push(filters.fixedAfter);
+            }
+
+            if (filters.fixedBefore) {
+                query += ' AND h.archived_at <= ?';
+                params.push(filters.fixedBefore);
+            }
+
+            if (filters.resourceType) {
+                query += ' AND EXISTS (SELECT 1 FROM resource_history rh2 WHERE rh2.history_id = h.id AND rh2.resource_type = ?)';
+                params.push(filters.resourceType);
+            }
+
+            query += ' GROUP BY h.finding_arn, h.vulnerability_id, h.title, h.severity, h.status, h.fix_available, h.inspector_score, h.first_observed_at, h.last_observed_at, h.archived_at';
+            query += ' ORDER BY h.archived_at DESC, h.severity DESC';
+
+            // Add pagination
+            const limit = filters.limit || 50;
+            const offset = filters.offset || 0;
+            query += ` LIMIT ? OFFSET ?`;
+            params.push(limit, offset);
+
+            this.db.all(query, params, (err, rows) => {
+                if (err) return reject(err);
+
+                // Process results to convert string arrays and parse data
+                const processedRows = rows.map(row => ({
+                    ...row,
+                    affected_resources: row.affected_resources ? row.affected_resources.split(',') : [],
+                    resource_types: row.resource_types ? row.resource_types.split(',') : [],
+                    fix_was_available: Boolean(row.fix_was_available)
+                }));
+
+                resolve(processedRows);
+            });
+        });
+    }
+
+    /**
+     * Get historical timeline for a specific vulnerability
+     * @param {string} findingArn - AWS Inspector finding ARN
+     * @returns {Promise<object>} Vulnerability history timeline
+     */
+    async getVulnerabilityTimeline(findingArn) {
+        return new Promise((resolve, reject) => {
+            // First check if vulnerability exists in current data
+            this.db.get(
+                'SELECT finding_arn FROM vulnerabilities WHERE finding_arn = ?',
+                [findingArn],
+                (err, currentRow) => {
+                    if (err) return reject(err);
+
+                    const currentStatus = currentRow ? 'ACTIVE' : 'FIXED';
+
+                    // Get historical records
+                    this.db.all(`
+                        SELECT
+                            h.vulnerability_id,
+                            h.title,
+                            h.severity,
+                            h.status,
+                            h.fix_available,
+                            h.inspector_score,
+                            h.first_observed_at,
+                            h.last_observed_at,
+                            h.archived_at,
+                            h.archived_from_report_id
+                        FROM vulnerability_history h
+                        WHERE h.finding_arn = ?
+                        ORDER BY h.archived_at DESC
+                    `, [findingArn], (err, historyRows) => {
+                        if (err) return reject(err);
+
+                        if (historyRows.length === 0 && !currentRow) {
+                            return reject(new Error('Vulnerability not found in history or current data'));
+                        }
+
+                        resolve({
+                            finding_arn: findingArn,
+                            current_status: currentStatus,
+                            history: historyRows
+                        });
+                    });
+                }
+            );
+        });
+    }
+
+    /**
+     * Create a new upload event for tracking workflow state
+     * @param {string} filename - Original filename of uploaded report
+     * @returns {Promise<string>} Upload ID
+     */
+    async createUploadEvent(filename) {
+        return new Promise((resolve, reject) => {
+            const uploadId = require('crypto').randomUUID();
+
+            this.db.run(`
+                INSERT INTO upload_events (upload_id, filename, status, started_at)
+                VALUES (?, ?, 'STARTED', CURRENT_TIMESTAMP)
+            `, [uploadId, filename], function(err) {
+                if (err) reject(err);
+                else resolve(uploadId);
+            });
+        });
+    }
+
+    /**
+     * Update upload event status and metadata
+     * @param {string} uploadId - Upload ID to update
+     * @param {string} status - New status
+     * @param {object} metadata - Additional metadata (records_archived, records_imported, error_message)
+     * @returns {Promise<void>}
+     */
+    async updateUploadEvent(uploadId, status, metadata = {}) {
+        return new Promise((resolve, reject) => {
+            let updateFields = ['status = ?'];
+            let params = [status];
+
+            if (metadata.records_archived !== undefined) {
+                updateFields.push('records_archived = ?');
+                params.push(metadata.records_archived);
+            }
+
+            if (metadata.records_imported !== undefined) {
+                updateFields.push('records_imported = ?');
+                params.push(metadata.records_imported);
+            }
+
+            if (metadata.error_message) {
+                updateFields.push('error_message = ?');
+                params.push(metadata.error_message);
+            }
+
+            if (status === 'COMPLETED' || status === 'FAILED') {
+                updateFields.push('completed_at = CURRENT_TIMESTAMP');
+            }
+
+            params.push(uploadId);
+
+            this.db.run(`
+                UPDATE upload_events
+                SET ${updateFields.join(', ')}
+                WHERE upload_id = ?
+            `, params, function(err) {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+
+    /**
+     * Clear current vulnerability data tables (for upload workflow)
+     * @param {object} transaction - Optional transaction context
+     * @returns {Promise<void>}
+     */
+    async clearCurrentTables(transaction = null) {
+        return new Promise((resolve, reject) => {
+            const db = transaction || this.db;
+
+            db.serialize(() => {
+                // Clear in reverse dependency order
+                db.run('DELETE FROM "references"', (err) => {
+                    if (err) return reject(err);
+
+                    db.run('DELETE FROM packages', (err) => {
+                        if (err) return reject(err);
+
+                        db.run('DELETE FROM resources', (err) => {
+                            if (err) return reject(err);
+
+                            db.run('DELETE FROM vulnerabilities', (err) => {
+                                if (err) return reject(err);
+                                resolve();
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    /**
+     * Get upload events history
+     * @param {object} filters - Filtering options
+     * @returns {Promise<array>} Upload events
+     */
+    async getUploadEvents(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let query = 'SELECT * FROM upload_events WHERE 1=1';
+            const params = [];
+
+            if (filters.status) {
+                query += ' AND status = ?';
+                params.push(filters.status);
+            }
+
+            if (filters.since) {
+                query += ' AND started_at >= ?';
+                params.push(filters.since);
+            }
+
+            query += ' ORDER BY started_at DESC';
+
+            if (filters.limit) {
+                query += ' LIMIT ?';
+                params.push(filters.limit);
+            }
+
+            this.db.all(query, params, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+    }
+
+    // ============================================================================
+    // TRANSACTION SUPPORT METHODS
+    // ============================================================================
+
+    /**
+     * Begin a database transaction
+     * @returns {Promise<void>}
+     */
+    async beginTransaction() {
+        return new Promise((resolve, reject) => {
+            this.db.run('BEGIN TRANSACTION', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+
+    /**
+     * Commit current transaction
+     * @returns {Promise<void>}
+     */
+    async commitTransaction() {
+        return new Promise((resolve, reject) => {
+            this.db.run('COMMIT', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+
+    /**
+     * Rollback current transaction
+     * @returns {Promise<void>}
+     */
+    async rollbackTransaction() {
+        return new Promise((resolve, reject) => {
+            this.db.run('ROLLBACK', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
 }
 
 module.exports = Database;

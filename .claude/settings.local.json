@@ -6,7 +6,13 @@
       "WebFetch(domain:www.digitala11y.com)",
       "WebFetch(domain:vanilla-calendar.pro)",
       "Bash(node server.js)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cat:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": []

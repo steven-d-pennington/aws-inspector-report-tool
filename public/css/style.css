@@ -847,3 +847,534 @@ code {
     border-color: rgba(41, 128, 185, 0.3);
 }
 
+/* ============================================================================ */
+/* FIXED VULNERABILITIES PAGE STYLES */
+/* ============================================================================ */
+
+/* Page Header */
+.page-header {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.page-description {
+    color: #666;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-top: 10px;
+}
+
+/* Summary Statistics Grid */
+.summary-section {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.stat-card h4 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.stat-card p {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-card.critical {
+    border-color: #e74c3c;
+    background: linear-gradient(135deg, #fff5f5 0%, #fee);
+}
+
+.stat-card.critical h4 {
+    color: #e74c3c;
+}
+
+.stat-card.high {
+    border-color: #f39c12;
+    background: linear-gradient(135deg, #fffaf0 0%, #fef5e7);
+}
+
+.stat-card.high h4 {
+    color: #f39c12;
+}
+
+.stat-card.medium {
+    border-color: #f1c40f;
+    background: linear-gradient(135deg, #fffef0 0%, #fefce8);
+}
+
+.stat-card.medium h4 {
+    color: #d68910;
+}
+
+.stat-card.low {
+    border-color: #27ae60;
+    background: linear-gradient(135deg, #f0fff4 0%, #e8f5e8);
+}
+
+.stat-card.low h4 {
+    color: #27ae60;
+}
+
+/* Loading and Error States */
+.loading-state, .error-state, .empty-state {
+    background: white;
+    border-radius: 15px;
+    padding: 60px 30px;
+    text-align: center;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-state h4 {
+    color: #e74c3c;
+    margin-bottom: 10px;
+}
+
+.error-state p {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+/* Empty State */
+.empty-state-content h3 {
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.empty-state-content p {
+    color: #999;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.empty-state-content ul {
+    text-align: left;
+    max-width: 400px;
+    margin: 0 auto 20px;
+}
+
+.empty-state-content li {
+    color: #666;
+    margin-bottom: 8px;
+}
+
+/* Results Section */
+.results-section {
+    background: white;
+    border-radius: 15px;
+    padding: 0;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 30px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.table-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.table-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.results-info {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pagination-controls button {
+    padding: 8px 15px;
+    font-size: 0.85rem;
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Table Styles */
+.table-container {
+    overflow-x: auto;
+}
+
+.vulnerabilities-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.vulnerabilities-table th {
+    background: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    padding: 15px 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.vulnerabilities-table td {
+    padding: 15px 12px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+}
+
+.vulnerabilities-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Vulnerability specific styles */
+.vulnerability-id {
+    font-family: monospace;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+    font-size: 0.85rem;
+}
+
+.vulnerability-title {
+    font-weight: 500;
+    color: #333;
+}
+
+.resource-info {
+    font-size: 0.85rem;
+}
+
+.resource-count {
+    font-weight: 500;
+    color: #495057;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.resource-types {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.date-text {
+    color: #6c757d;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.days-active {
+    font-weight: 500;
+    color: #495057;
+}
+
+.fix-available.yes {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.fix-available.no {
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-history {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-history:hover {
+    background: #5a6268;
+}
+
+/* Filter Form Specific Styles */
+.filter-form {
+    background: white;
+    border-radius: 15px;
+    padding: 25px 30px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-export {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-export:hover {
+    background: #138496;
+}
+
+/* History Modal Styles */
+.modal {
+    backdrop-filter: blur(5px);
+}
+
+.vulnerability-timeline {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.timeline-header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 20px;
+}
+
+.timeline-header h4 {
+    color: #333;
+    margin-bottom: 10px;
+    word-break: break-all;
+}
+
+.current-status {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.status-active {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.status-fixed {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.timeline-items {
+    position: relative;
+}
+
+.timeline-items::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 60px;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: 11px;
+    top: 5px;
+    width: 18px;
+    height: 18px;
+    background: #667eea;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.timeline-date {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 3px solid #667eea;
+}
+
+.timeline-content h5 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+}
+
+.detail-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.detail-label {
+    font-weight: 500;
+    color: #495057;
+    min-width: 120px;
+}
+
+.detail-row .severity-badge {
+    margin-left: 0;
+}
+
+/* Modal Close Button */
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: #f8f9fa;
+    color: #333;
+}
+
+/* Responsive Design for Fixed Vulnerabilities */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .table-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .table-controls {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .pagination-controls {
+        justify-content: center;
+    }
+
+    .filter-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .timeline-item {
+        padding-left: 40px;
+    }
+
+    .timeline-marker {
+        left: 6px;
+        width: 12px;
+        height: 12px;
+    }
+
+    .timeline-items::before {
+        left: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .vulnerabilities-table {
+        font-size: 0.8rem;
+    }
+
+    .vulnerabilities-table th,
+    .vulnerabilities-table td {
+        padding: 10px 8px;
+    }
+
+    .page-header,
+    .summary-section,
+    .filter-form,
+    .results-section {
+        margin-left: -10px;
+        margin-right: -10px;
+        border-radius: 0;
+    }
+}
+
