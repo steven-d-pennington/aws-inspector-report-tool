@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "Bash(cat:*)",
+      "Bash(tree:*)",
+      "Bash(sqlite3:*)",
+      "Bash(node:*)",
+      "Bash(npm install)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(sed:*)",
+      "Bash(npm test:*)",
+      "Bash(npx mocha:*)",
+      "Bash(npx mocha tests:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm run test:contract:*)",
+      "Bash(npx mocha tests/contract/test_modules_toggle.js:*)",
+      "Bash(./node_modules/.bin/mocha:*)",
+      "Bash(npm ls:*)",
+      "Bash(dir:*)",
+      "Bash(npm:*)",
+      "Bash(taskkill:*)",
+      "Bash(find:*)",
+      "Bash(timeout:*)",
+      "Bash(rd:*)",
+      "Bash(del test-endpoint-logic.js)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
