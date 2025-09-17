@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const Database = require('./src/models/database');
 const reportService = require('./src/services/reportService');
 const exportService = require('./src/services/exportService');
+const HistoryService = require('./src/services/historyService');
 
 const app = express();
 const PORT = 3010;
@@ -184,6 +185,239 @@ app.delete('/api/reports/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// FIXED VULNERABILITIES API ENDPOINTS
+// ============================================================================
+
+// Fixed Vulnerabilities Report Page
+app.get('/fixed-vulnerabilities', async (req, res) => {
+    try {
+        // We'll render the page template here (T014 will implement the template)
+        res.render('fixed-vulnerabilities', {
+            title: 'Fixed Vulnerabilities Report'
+        });
+    } catch (error) {
+        console.error('Fixed vulnerabilities page error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Fixed Vulnerabilities API Endpoint
+app.get('/api/fixed-vulnerabilities', async (req, res) => {
+    try {
+        // Initialize history service
+        const historyService = new HistoryService(db);
+
+        // Parse and validate query parameters
+        const filters = {};
+
+        // Severity filter
+        if (req.query.severity) {
+            const validSeverities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+            if (!validSeverities.includes(req.query.severity.toUpperCase())) {
+                return res.status(400).json({
+                    errors: [{
+                        field: 'severity',
+                        message: 'Invalid severity value. Must be one of: CRITICAL, HIGH, MEDIUM, LOW',
+                        value: req.query.severity
+                    }]
+                });
+            }
+            filters.severity = req.query.severity.toUpperCase();
+        }
+
+        // Date filters
+        if (req.query.fixedAfter) {
+            const fixedAfterDate = new Date(req.query.fixedAfter);
+            if (isNaN(fixedAfterDate.getTime())) {
+                return res.status(400).json({
+                    errors: [{
+                        field: 'fixedAfter',
+                        message: 'Invalid date format. Expected YYYY-MM-DD',
+                        value: req.query.fixedAfter
+                    }]
+                });
+            }
+            filters.fixedAfter = req.query.fixedAfter;
+        }
+
+        if (req.query.fixedBefore) {
+            const fixedBeforeDate = new Date(req.query.fixedBefore);
+            if (isNaN(fixedBeforeDate.getTime())) {
+                return res.status(400).json({
+                    errors: [{
+                        field: 'fixedBefore',
+                        message: 'Invalid date format. Expected YYYY-MM-DD',
+                        value: req.query.fixedBefore
+                    }]
+                });
+            }
+            filters.fixedBefore = req.query.fixedBefore;
+        }
+
+        // Resource type filter
+        if (req.query.resourceType) {
+            filters.resourceType = req.query.resourceType;
+        }
+
+        // Pagination
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+
+        if (limit < 1 || limit > 1000) {
+            return res.status(400).json({
+                errors: [{
+                    field: 'limit',
+                    message: 'Limit must be between 1 and 1000',
+                    value: req.query.limit
+                }]
+            });
+        }
+
+        if (offset < 0) {
+            return res.status(400).json({
+                errors: [{
+                    field: 'offset',
+                    message: 'Offset must be 0 or greater',
+                    value: req.query.offset
+                }]
+            });
+        }
+
+        filters.limit = limit;
+        filters.offset = offset;
+
+        // Get fixed vulnerabilities data
+        const result = await historyService.findFixedVulnerabilities(filters);
+
+        res.json(result);
+    } catch (error) {
+        console.error('Fixed vulnerabilities API error:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            code: 'INTERNAL_ERROR'
+        });
+    }
+});
+
+// Vulnerability History Timeline API
+app.get('/api/vulnerability-history/:findingArn', async (req, res) => {
+    try {
+        // Initialize history service
+        const historyService = new HistoryService(db);
+
+        // Decode the finding ARN (it may be URL encoded)
+        const findingArn = decodeURIComponent(req.params.findingArn);
+
+        // Validate finding ARN format (basic validation)
+        if (!findingArn.startsWith('arn:aws:inspector2:')) {
+            return res.status(400).json({
+                message: 'Invalid finding ARN format',
+                code: 'INVALID_ARN'
+            });
+        }
+
+        // Get vulnerability history timeline
+        const timeline = await historyService.getVulnerabilityHistory(findingArn);
+
+        res.json(timeline);
+    } catch (error) {
+        console.error('Vulnerability history API error:', error);
+
+        if (error.message.includes('not found')) {
+            return res.status(404).json({
+                message: 'Vulnerability not found in history or current data',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        res.status(500).json({
+            message: 'Internal server error',
+            code: 'INTERNAL_ERROR'
+        });
+    }
+});
+
+// Upload Events API (for monitoring)
+app.get('/api/upload-events', async (req, res) => {
+    try {
+        const filters = {};
+
+        if (req.query.status) {
+            filters.status = req.query.status;
+        }
+
+        if (req.query.since) {
+            filters.since = req.query.since;
+        }
+
+        if (req.query.limit) {
+            filters.limit = parseInt(req.query.limit) || 50;
+        }
+
+        const uploadHistory = await reportService.getUploadHistory(filters);
+
+        res.json(uploadHistory);
+    } catch (error) {
+        console.error('Upload events API error:', error);
+        res.status(500).json({
+            message: 'Internal server error',
+            code: 'INTERNAL_ERROR'
+        });
+    }
+});
+
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+    try {
+        const historyService = new HistoryService(db);
+
+        const healthChecks = {
+            database: 'unknown',
+            history_service: 'unknown',
+            report_service: 'unknown'
+        };
+
+        // Test database connectivity
+        try {
+            await db.getSummary();
+            healthChecks.database = 'healthy';
+        } catch (error) {
+            healthChecks.database = 'error';
+        }
+
+        // Test history service
+        try {
+            const historyHealth = await historyService.healthCheck();
+            healthChecks.history_service = historyHealth.status;
+        } catch (error) {
+            healthChecks.history_service = 'error';
+        }
+
+        // Test report service
+        try {
+            const reportHealth = await reportService.healthCheck();
+            healthChecks.report_service = reportHealth.status;
+        } catch (error) {
+            healthChecks.report_service = 'error';
+        }
+
+        const allHealthy = Object.values(healthChecks).every(status => status === 'healthy');
+
+        res.json({
+            status: allHealthy ? 'healthy' : 'degraded',
+            timestamp: new Date().toISOString(),
+            components: healthChecks
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
     }
 });
 

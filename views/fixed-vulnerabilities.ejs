@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Fixed Vulnerabilities</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <ul class="nav-links">
+                <li><a href="/">Upload</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                <li><a href="/fixed-vulnerabilities" class="active">Fixed Vulnerabilities</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Fixed Vulnerabilities Report</h2>
+            <p class="page-description">
+                Track vulnerabilities that existed in previous reports but are no longer present in current data.
+                This helps monitor security improvements and vulnerability remediation efforts.
+            </p>
+        </div>
+
+        <div class="filters-section">
+            <h3>Filter Fixed Vulnerabilities</h3>
+            <form id="fixedVulnerabilityFilters" class="filter-form">
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label for="severity">Severity</label>
+                        <select id="severity" name="severity">
+                            <option value="">All Severities</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="LOW">Low</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="fixedAfter">Fixed After</label>
+                        <input type="date" id="fixedAfter" name="fixedAfter"
+                               title="Show vulnerabilities fixed after this date">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="fixedBefore">Fixed Before</label>
+                        <input type="date" id="fixedBefore" name="fixedBefore"
+                               title="Show vulnerabilities fixed before this date">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resourceType">Resource Type</label>
+                        <select id="resourceType" name="resourceType">
+                            <option value="">All Resource Types</option>
+                            <option value="EC2Instance">EC2 Instance</option>
+                            <option value="ECRContainerImage">ECR Container Image</option>
+                            <option value="ECRRepository">ECR Repository</option>
+                            <option value="LambdaFunction">Lambda Function</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <button type="button" id="clearFilters" class="btn btn-secondary">Clear Filters</button>
+                    <button type="button" id="exportResults" class="btn btn-export">Export Results</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Loading fixed vulnerabilities...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="error-state" style="display: none;">
+            <h4>Error Loading Data</h4>
+            <p id="errorMessage"></p>
+            <button type="button" id="retryLoad" class="btn btn-primary">Retry</button>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div id="summarySection" class="summary-section" style="display: none;">
+            <h3>Summary Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4 id="totalFixed">0</h4>
+                    <p>Total Fixed</p>
+                </div>
+                <div class="stat-card">
+                    <h4 id="avgDaysActive">0</h4>
+                    <p>Avg Days Active</p>
+                </div>
+                <div class="stat-card critical">
+                    <h4 id="criticalFixed">0</h4>
+                    <p>Critical Fixed</p>
+                </div>
+                <div class="stat-card high">
+                    <h4 id="highFixed">0</h4>
+                    <p>High Fixed</p>
+                </div>
+                <div class="stat-card medium">
+                    <h4 id="mediumFixed">0</h4>
+                    <p>Medium Fixed</p>
+                </div>
+                <div class="stat-card low">
+                    <h4 id="lowFixed">0</h4>
+                    <p>Low Fixed</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div id="resultsSection" class="results-section" style="display: none;">
+            <div class="table-header">
+                <h3>Fixed Vulnerabilities</h3>
+                <div class="table-controls">
+                    <span id="resultsInfo" class="results-info"></span>
+                    <div class="pagination-controls">
+                        <button type="button" id="prevPage" class="btn btn-small" disabled>Previous</button>
+                        <span id="pageInfo">Page 1 of 1</span>
+                        <button type="button" id="nextPage" class="btn btn-small" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="fixedVulnerabilitiesTable" class="vulnerabilities-table">
+                    <thead>
+                        <tr>
+                            <th>Vulnerability ID</th>
+                            <th>Title</th>
+                            <th>Severity</th>
+                            <th>Affected Resources</th>
+                            <th>First Observed</th>
+                            <th>Fixed Date</th>
+                            <th>Days Active</th>
+                            <th>Fix Available</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vulnerabilitiesTableBody">
+                        <!-- Table rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-content">
+                <h3>No Fixed Vulnerabilities Found</h3>
+                <p>
+                    No vulnerabilities have been fixed yet, or no vulnerabilities match your current filters.
+                    This could mean:
+                </p>
+                <ul>
+                    <li>This is the first report uploaded to the system</li>
+                    <li>No vulnerabilities have been remediated since the last upload</li>
+                    <li>The applied filters are too restrictive</li>
+                </ul>
+                <p>
+                    Try adjusting your filters or check back after uploading additional vulnerability reports.
+                </p>
+            </div>
+        </div>
+
+        <!-- Vulnerability History Modal -->
+        <div id="historyModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Vulnerability History</h3>
+                    <button type="button" class="modal-close" id="closeHistoryModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="historyContent">
+                        <div class="loading-spinner"></div>
+                        <p>Loading vulnerability history...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/fixed-vulnerabilities.js"></script>
+</body>
+</html>

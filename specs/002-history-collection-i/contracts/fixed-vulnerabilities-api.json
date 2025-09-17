@@ -1,0 +1,457 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vulnerability Dashboard API - Fixed Vulnerabilities Extension",
+    "description": "API contract for fixed vulnerabilities reporting and history tracking functionality",
+    "version": "1.2.0"
+  },
+  "paths": {
+    "/fixed-vulnerabilities": {
+      "get": {
+        "summary": "Fixed Vulnerabilities Report Page",
+        "description": "Render the fixed vulnerabilities report page showing vulnerabilities that existed in previous reports but are no longer present",
+        "responses": {
+          "200": {
+            "description": "Successfully rendered fixed vulnerabilities page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string",
+                  "description": "Rendered EJS template with fixed vulnerabilities data"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fixed-vulnerabilities": {
+      "get": {
+        "summary": "Get fixed vulnerabilities data",
+        "description": "Retrieve vulnerabilities that existed in previous reports but are no longer present in current data",
+        "parameters": [
+          {
+            "name": "severity",
+            "in": "query",
+            "description": "Filter by vulnerability severity",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+            }
+          },
+          {
+            "name": "fixedAfter",
+            "in": "query",
+            "description": "Show vulnerabilities fixed after this date (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-09-01"
+            }
+          },
+          {
+            "name": "fixedBefore",
+            "in": "query",
+            "description": "Show vulnerabilities fixed before this date (ISO 8601)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-09-17"
+            }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "description": "Filter by affected AWS resource type",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "EC2Instance"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of results to return",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of results to skip for pagination",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved fixed vulnerabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FixedVulnerabilitiesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vulnerability-history/{findingArn}": {
+      "get": {
+        "summary": "Get vulnerability history timeline",
+        "description": "Retrieve historical timeline for a specific vulnerability showing all archived versions",
+        "parameters": [
+          {
+            "name": "findingArn",
+            "in": "path",
+            "description": "AWS Inspector finding ARN",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "arn:aws:inspector2:us-east-1:123456789012:finding/0123456789abcdef"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved vulnerability history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VulnerabilityHistoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Vulnerability not found in history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FixedVulnerabilitiesResponse": {
+        "type": "object",
+        "required": ["data", "pagination", "summary"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixedVulnerability"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/FixedVulnerabilitiesSummary"
+          }
+        }
+      },
+      "FixedVulnerability": {
+        "type": "object",
+        "required": ["finding_arn", "vulnerability_id", "title", "severity", "fixed_date"],
+        "properties": {
+          "finding_arn": {
+            "type": "string",
+            "description": "AWS Inspector finding ARN"
+          },
+          "vulnerability_id": {
+            "type": "string",
+            "description": "CVE identifier or vulnerability ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Vulnerability title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+            "description": "Vulnerability severity level"
+          },
+          "affected_resources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of AWS resource IDs that were affected"
+          },
+          "resource_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of AWS resource types that were affected"
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability was first detected",
+            "nullable": true
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability was last detected",
+            "nullable": true
+          },
+          "fixed_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability was determined to be fixed"
+          },
+          "days_active": {
+            "type": "integer",
+            "description": "Number of days vulnerability was active",
+            "minimum": 0
+          },
+          "fix_was_available": {
+            "type": "boolean",
+            "description": "Whether a fix was available when vulnerability was active"
+          },
+          "inspector_score": {
+            "type": "number",
+            "description": "AWS Inspector risk score when active",
+            "minimum": 0.0,
+            "maximum": 10.0
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": ["total", "limit", "offset", "has_more"],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of fixed vulnerabilities matching filters",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of results per page",
+            "minimum": 1
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Number of results skipped",
+            "minimum": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more results are available"
+          }
+        }
+      },
+      "FixedVulnerabilitiesSummary": {
+        "type": "object",
+        "required": ["total_fixed"],
+        "properties": {
+          "total_fixed": {
+            "type": "integer",
+            "description": "Total number of fixed vulnerabilities",
+            "minimum": 0
+          },
+          "avg_days_active": {
+            "type": "number",
+            "description": "Average number of days vulnerabilities were active before being fixed",
+            "minimum": 0
+          },
+          "critical_fixed": {
+            "type": "integer",
+            "description": "Number of CRITICAL vulnerabilities fixed",
+            "minimum": 0
+          },
+          "high_fixed": {
+            "type": "integer",
+            "description": "Number of HIGH vulnerabilities fixed",
+            "minimum": 0
+          },
+          "medium_fixed": {
+            "type": "integer",
+            "description": "Number of MEDIUM vulnerabilities fixed",
+            "minimum": 0
+          },
+          "low_fixed": {
+            "type": "integer",
+            "description": "Number of LOW vulnerabilities fixed",
+            "minimum": 0
+          }
+        }
+      },
+      "VulnerabilityHistoryResponse": {
+        "type": "object",
+        "required": ["finding_arn", "history"],
+        "properties": {
+          "finding_arn": {
+            "type": "string",
+            "description": "AWS Inspector finding ARN"
+          },
+          "current_status": {
+            "type": "string",
+            "enum": ["ACTIVE", "FIXED"],
+            "description": "Current status of the vulnerability"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VulnerabilityHistoryRecord"
+            }
+          }
+        }
+      },
+      "VulnerabilityHistoryRecord": {
+        "type": "object",
+        "required": ["archived_at", "severity", "status"],
+        "properties": {
+          "vulnerability_id": {
+            "type": "string",
+            "description": "CVE identifier"
+          },
+          "title": {
+            "type": "string",
+            "description": "Vulnerability title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "SUPPRESSED", "CLOSED"]
+          },
+          "fix_available": {
+            "type": "string",
+            "enum": ["YES", "NO"]
+          },
+          "inspector_score": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 10.0
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this version was archived"
+          },
+          "archived_from_report_id": {
+            "type": "integer",
+            "description": "Report ID that this version came from"
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["errors"],
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field name that failed validation"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Validation error message"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Invalid value that was provided"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      }
+    }
+  }
+}
