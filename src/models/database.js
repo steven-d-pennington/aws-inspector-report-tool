@@ -340,6 +340,11 @@ class Database {
                 params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
             }
 
+            if (filters.lastObservedAt) {
+                query += ' AND v.last_observed_at IS NOT NULL AND v.last_observed_at <= ?';
+                params.push(filters.lastObservedAt);
+            }
+
             query += ' ORDER BY v.severity DESC, v.inspector_score DESC';
 
             this.db.all(query, params, async (err, rows) => {
@@ -490,6 +495,11 @@ class Database {
             if (filters.search) {
                 query += ' AND (v.title LIKE ? OR v.description LIKE ? OR v.vulnerability_id LIKE ?)';
                 params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
+            }
+
+            if (filters.lastObservedAt) {
+                query += ' AND v.last_observed_at IS NOT NULL AND v.last_observed_at <= ?';
+                params.push(filters.lastObservedAt);
             }
 
             query += ' GROUP BY v.vulnerability_id, v.title, v.description, v.severity, v.status, v.fix_available, v.inspector_score, v.epss_score, v.exploit_available';

@@ -356,6 +356,14 @@ body {
     border-color: #667eea;
 }
 
+.filter-group input[type="date"] {
+    cursor: pointer;
+}
+
+.filter-group input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+}
+
 .filter-actions {
     margin-top: 20px;
     display: flex;

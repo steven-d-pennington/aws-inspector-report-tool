@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell:*)",
+      "WebSearch",
+      "WebFetch(domain:www.digitala11y.com)",
+      "WebFetch(domain:vanilla-calendar.pro)",
+      "Bash(node server.js)",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
