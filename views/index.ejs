@@ -23,8 +23,9 @@
             <h2>Upload Vulnerability Report</h2>
             <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">📁</div>
-                <p>Drag and drop your JSON report here or click to browse</p>
-                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <p>Drag and drop your AWS Inspector report here or click to browse</p>
+                <p class="upload-formats">Supported formats: JSON, CSV</p>
+                <input type="file" id="fileInput" accept=".json,.csv" style="display: none;">
                 <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
                     Choose File
                 </button>

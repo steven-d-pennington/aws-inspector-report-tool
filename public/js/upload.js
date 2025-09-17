@@ -35,15 +35,35 @@ uploadArea.addEventListener('click', function() {
 function handleFileSelect(file) {
     if (!file) return;
 
-    if (!file.name.endsWith('.json')) {
-        alert('Please select a JSON file');
+    // Check for supported file formats (JSON and CSV)
+    const supportedExtensions = ['.json', '.csv'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    if (!supportedExtensions.includes(fileExtension)) {
+        alert(`Please select a JSON or CSV file. Supported formats: ${supportedExtensions.join(', ')}`);
         return;
     }
 
     selectedFile = file;
 
+    // Display file information with format indicator
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileSize').textContent = `Size: ${formatFileSize(file.size)}`;
+
+    // Add file format indicator
+    const formatIndicator = document.createElement('span');
+    formatIndicator.className = 'file-format-indicator';
+    formatIndicator.textContent = fileExtension.toUpperCase().substring(1) + ' Format';
+    formatIndicator.style.cssText = 'margin-left: 10px; padding: 2px 6px; background: #007bff; color: white; font-size: 10px; border-radius: 3px;';
+
+    const fileNameElement = document.getElementById('fileName');
+    // Remove any existing format indicators
+    const existingIndicator = fileNameElement.querySelector('.file-format-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    fileNameElement.appendChild(formatIndicator);
+
     document.getElementById('fileInfo').style.display = 'block';
     document.getElementById('uploadArea').style.display = 'none';
 }
@@ -92,10 +112,21 @@ async function uploadFile() {
         if (response.ok) {
             document.getElementById('resultTitle').textContent = 'Upload Successful!';
             document.getElementById('resultMessage').textContent = result.message;
-            document.getElementById('resultDetails').innerHTML = `
+
+            let detailsHTML = `
                 <p><strong>Report ID:</strong> ${result.reportId}</p>
                 <p><strong>Vulnerabilities Processed:</strong> ${result.vulnerabilityCount}</p>
             `;
+
+            // Add file format and processing time if available
+            if (result.fileFormat) {
+                detailsHTML += `<p><strong>File Format:</strong> ${result.fileFormat.toUpperCase()}</p>`;
+            }
+            if (result.processingTime) {
+                detailsHTML += `<p><strong>Processing Time:</strong> ${result.processingTime}ms</p>`;
+            }
+
+            document.getElementById('resultDetails').innerHTML = detailsHTML;
             document.getElementById('uploadResult').className = 'result success';
 
             // Refresh recent reports

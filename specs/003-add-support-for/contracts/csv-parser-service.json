@@ -1,0 +1,356 @@
+{
+  "service": "CSV Parser Service",
+  "version": "1.0.0",
+  "description": "Internal service contract for parsing CSV files and transforming to JSON structure",
+  "interface": {
+    "parseInspectorCSV": {
+      "description": "Parse AWS Inspector CSV file and transform to JSON structure",
+      "input": {
+        "type": "object",
+        "properties": {
+          "filePath": {
+            "type": "string",
+            "description": "Absolute path to the CSV file"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "validateSchema": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether to validate CSV schema before parsing"
+              },
+              "skipInvalidRows": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to skip invalid rows and continue processing"
+              },
+              "maxRows": {
+                "type": "integer",
+                "default": null,
+                "description": "Maximum number of rows to process (null for no limit)"
+              }
+            }
+          }
+        },
+        "required": ["filePath"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "findings": {
+            "type": "array",
+            "description": "Array of vulnerability findings in JSON format",
+            "items": {
+              "$ref": "#/components/schemas/VulnerabilityFinding"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "totalRows": {
+                "type": "integer",
+                "description": "Total number of CSV rows processed"
+              },
+              "validRows": {
+                "type": "integer",
+                "description": "Number of successfully parsed rows"
+              },
+              "invalidRows": {
+                "type": "integer",
+                "description": "Number of rows that failed parsing"
+              },
+              "processingTime": {
+                "type": "number",
+                "description": "Processing time in milliseconds"
+              },
+              "detectedColumns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "CSV columns that were detected"
+              }
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParseError"
+            },
+            "description": "List of parsing errors encountered"
+          }
+        },
+        "required": ["findings", "metadata"]
+      },
+      "throws": [
+        "InvalidCSVFormatError",
+        "MissingRequiredColumnsError",
+        "FileNotFoundError",
+        "FileReadError"
+      ]
+    },
+    "validateCSVSchema": {
+      "description": "Validate that CSV file has required columns",
+      "input": {
+        "type": "object",
+        "properties": {
+          "filePath": {
+            "type": "string",
+            "description": "Path to CSV file"
+          }
+        },
+        "required": ["filePath"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether CSV schema is valid"
+          },
+          "missingColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of missing required columns"
+          },
+          "extraColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of extra columns not in expected schema"
+          },
+          "detectedColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "All columns found in CSV header"
+          }
+        },
+        "required": ["valid", "missingColumns", "detectedColumns"]
+      }
+    },
+    "transformRowToFinding": {
+      "description": "Transform single CSV row to vulnerability finding JSON object",
+      "input": {
+        "type": "object",
+        "properties": {
+          "csvRow": {
+            "type": "object",
+            "description": "CSV row data as key-value pairs"
+          },
+          "rowNumber": {
+            "type": "integer",
+            "description": "Row number for error reporting"
+          }
+        },
+        "required": ["csvRow", "rowNumber"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "finding": {
+            "$ref": "#/components/schemas/VulnerabilityFinding"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Non-fatal warnings during transformation"
+          }
+        },
+        "required": ["finding"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VulnerabilityFinding": {
+        "type": "object",
+        "description": "Transformed vulnerability finding matching existing JSON structure",
+        "properties": {
+          "awsAccountId": {
+            "type": "string"
+          },
+          "findingArn": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNTRIAGED"]
+          },
+          "status": {
+            "type": "string"
+          },
+          "fixAvailable": {
+            "type": "boolean"
+          },
+          "inspectorScore": {
+            "type": "number"
+          },
+          "epss": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            }
+          },
+          "exploitAvailable": {
+            "type": "boolean"
+          },
+          "firstObservedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastObservedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "platform": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "packageVulnerabilityDetails": {
+            "type": "object",
+            "properties": {
+              "vulnerabilityId": {
+                "type": "string"
+              },
+              "referenceUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "vulnerablePackages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "fixedInVersion": {
+                      "type": "string"
+                    },
+                    "packageManager": {
+                      "type": "string"
+                    },
+                    "filePath": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "required": ["awsAccountId", "findingArn", "title", "description", "severity"]
+      },
+      "ParseError": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "integer",
+            "description": "Row number where error occurred"
+          },
+          "column": {
+            "type": "string",
+            "description": "Column name where error occurred"
+          },
+          "errorType": {
+            "type": "string",
+            "enum": ["VALIDATION_ERROR", "TYPE_CONVERSION_ERROR", "MALFORMED_DATA", "MISSING_REQUIRED_FIELD"]
+          },
+          "message": {
+            "type": "string",
+            "description": "Detailed error message"
+          },
+          "value": {
+            "type": "string",
+            "description": "Value that caused the error"
+          }
+        },
+        "required": ["row", "errorType", "message"]
+      }
+    }
+  },
+  "errors": {
+    "InvalidCSVFormatError": {
+      "description": "CSV file format is invalid or corrupted",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": "string"
+        }
+      }
+    },
+    "MissingRequiredColumnsError": {
+      "description": "CSV file is missing required columns",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "missingColumns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "FileNotFoundError": {
+      "description": "CSV file not found at specified path",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

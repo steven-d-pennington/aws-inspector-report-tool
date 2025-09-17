@@ -1,0 +1,221 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Upload Endpoint API Contract",
+    "version": "1.0.0",
+    "description": "API contract for dual format (JSON/CSV) file upload endpoint"
+  },
+  "paths": {
+    "/upload": {
+      "post": {
+        "summary": "Upload AWS Inspector Report",
+        "description": "Upload vulnerability report in JSON or CSV format for processing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reportFile": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "AWS Inspector report file (.json or .csv)"
+                  }
+                },
+                "required": ["reportFile"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file format or malformed data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported file format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsupportedFormatError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error during processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UploadSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Report processed successfully"
+          },
+          "reportId": {
+            "type": "integer",
+            "description": "Database ID of the processed report",
+            "example": 123
+          },
+          "vulnerabilityCount": {
+            "type": "integer",
+            "description": "Number of vulnerabilities imported",
+            "example": 45
+          },
+          "fileFormat": {
+            "type": "string",
+            "enum": ["json", "csv"],
+            "description": "Detected and processed file format"
+          },
+          "processingTime": {
+            "type": "number",
+            "description": "Processing time in milliseconds",
+            "example": 1250.5
+          }
+        },
+        "required": ["success", "message", "reportId", "vulnerabilityCount", "fileFormat"]
+      },
+      "UploadErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message describing what went wrong"
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "fileFormat": {
+                "type": "string",
+                "enum": ["json", "csv", "unknown"]
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "fileSize": {
+                "type": "integer"
+              },
+              "errorType": {
+                "type": "string",
+                "enum": ["VALIDATION_ERROR", "PARSING_ERROR", "PROCESSING_ERROR"]
+              }
+            }
+          }
+        },
+        "required": ["error"]
+      },
+      "UnsupportedFormatError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Unsupported file format. Please upload .json or .csv files only."
+          },
+          "supportedFormats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [".json", ".csv"]
+          },
+          "detectedFormat": {
+            "type": "string",
+            "description": "The format that was detected",
+            "example": ".xlsx"
+          }
+        },
+        "required": ["error", "supportedFormats"]
+      },
+      "CSVValidationError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "CSV validation failed"
+          },
+          "validationErrors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "integer",
+                  "description": "Row number where error occurred (1-based)"
+                },
+                "column": {
+                  "type": "string",
+                  "description": "Column name where error occurred"
+                },
+                "errorType": {
+                  "type": "string",
+                  "enum": ["MISSING_COLUMN", "INVALID_DATA_TYPE", "EMPTY_REQUIRED_FIELD", "MALFORMED_DATA"]
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Specific error message"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value that caused the error"
+                }
+              },
+              "required": ["row", "column", "errorType", "message"]
+            }
+          },
+          "requiredColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of required CSV columns"
+          }
+        },
+        "required": ["error", "validationErrors"]
+      }
+    }
+  }
+}

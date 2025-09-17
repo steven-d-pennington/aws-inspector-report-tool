@@ -1,4 +1,4 @@
-﻿# vulnerability-dashboard Development Guidelines
+# vulnerability-dashboard Development Guidelines
 
 Auto-generated from all feature plans. Last updated: 2025-09-17
 
@@ -23,4 +23,5 @@ Node.js (JavaScript ES6+): Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
 
