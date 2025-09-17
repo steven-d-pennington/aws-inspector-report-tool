@@ -94,6 +94,71 @@ class Database {
                         url TEXT,
                         FOREIGN KEY (vulnerability_id) REFERENCES vulnerabilities(id)
                     )
+                `);
+
+                // Settings table
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        key TEXT UNIQUE NOT NULL,
+                        value TEXT,
+                        type TEXT DEFAULT 'string',
+                        description TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+
+                // Module Settings table
+                this.db.run(`
+                    CREATE TABLE IF NOT EXISTS module_settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        module_id TEXT UNIQUE NOT NULL,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        enabled BOOLEAN DEFAULT 0,
+                        is_default BOOLEAN DEFAULT 0,
+                        display_order INTEGER,
+                        config JSON,
+                        icon TEXT,
+                        route TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+
+                // Create update trigger for settings
+                this.db.run(`
+                    CREATE TRIGGER IF NOT EXISTS update_settings_timestamp
+                    AFTER UPDATE ON settings
+                    BEGIN
+                        UPDATE settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+                    END
+                `);
+
+                // Create update trigger for module_settings
+                this.db.run(`
+                    CREATE TRIGGER IF NOT EXISTS update_module_settings_timestamp
+                    AFTER UPDATE ON module_settings
+                    BEGIN
+                        UPDATE module_settings SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+                    END
+                `);
+
+                // Insert default settings data
+                this.db.run(`
+                    INSERT OR IGNORE INTO settings (key, value, type, description) VALUES
+                    ('app_title', 'AWS Security Dashboard', 'string', 'Application title'),
+                    ('theme', 'light', 'string', 'UI theme'),
+                    ('auto_refresh', 'false', 'boolean', 'Auto-refresh dashboard'),
+                    ('refresh_interval', '300', 'number', 'Refresh interval in seconds')
+                `);
+
+                // Insert default module settings data
+                this.db.run(`
+                    INSERT OR IGNORE INTO module_settings (module_id, name, enabled, is_default, display_order, route) VALUES
+                    ('aws-inspector', 'AWS Inspector', 1, 1, 1, '/'),
+                    ('sbom', 'SBOM Reports', 0, 0, 2, '/sbom')
                 `, (err) => {
                     if (err) reject(err);
                     else resolve();
@@ -653,6 +718,164 @@ class Database {
                     }
                 );
             });
+        });
+    }
+
+    // Settings Management Methods
+    async getSettings() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT key, value, type, description FROM settings`,
+                (err, rows) => {
+                    if (err) reject(err);
+                    else {
+                        const settings = {};
+                        rows.forEach(row => {
+                            let value = row.value;
+                            if (row.type === 'boolean') {
+                                value = value === 'true';
+                            } else if (row.type === 'number') {
+                                value = parseFloat(value);
+                            }
+                            settings[row.key] = value;
+                        });
+                        resolve({ settings });
+                    }
+                }
+            );
+        });
+    }
+
+    async updateSetting(key, value, type = 'string') {
+        return new Promise((resolve, reject) => {
+            const valueStr = typeof value === 'boolean' ? value.toString() : value.toString();
+
+            this.db.run(
+                `UPDATE settings SET value = ?, type = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?`,
+                [valueStr, type, key],
+                function(err) {
+                    if (err) reject(err);
+                    else if (this.changes === 0) {
+                        reject(new Error(`Setting with key '${key}' not found`));
+                    } else {
+                        resolve();
+                    }
+                }
+            );
+        });
+    }
+
+    // Module Management Methods
+    async getModules() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM module_settings ORDER BY display_order ASC`,
+                (err, rows) => {
+                    if (err) reject(err);
+                    else {
+                        const modules = rows.map(row => ({
+                            ...row,
+                            enabled: Boolean(row.enabled),
+                            is_default: Boolean(row.is_default),
+                            config: row.config ? JSON.parse(row.config) : null
+                        }));
+                        resolve(modules);
+                    }
+                }
+            );
+        });
+    }
+
+    async getModuleById(moduleId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                `SELECT * FROM module_settings WHERE module_id = ?`,
+                [moduleId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else if (!row) {
+                        resolve(null);
+                    } else {
+                        resolve({
+                            ...row,
+                            enabled: Boolean(row.enabled),
+                            is_default: Boolean(row.is_default),
+                            config: row.config ? JSON.parse(row.config) : null
+                        });
+                    }
+                }
+            );
+        });
+    }
+
+    async toggleModule(moduleId, enabled) {
+        return new Promise((resolve, reject) => {
+            // First check if module exists and if it's a default module
+            this.db.get(
+                `SELECT * FROM module_settings WHERE module_id = ?`,
+                [moduleId],
+                (err, row) => {
+                    if (err) return reject(err);
+                    if (!row) return reject(new Error(`Module '${moduleId}' does not exist`));
+
+                    // Prevent disabling default modules
+                    if (row.is_default && !enabled) {
+                        return reject(new Error('Cannot disable default module'));
+                    }
+
+                    // Check if disabling would leave no enabled modules
+                    if (!enabled) {
+                        this.db.get(
+                            `SELECT COUNT(*) as enabledCount FROM module_settings WHERE enabled = 1`,
+                            (err, countRow) => {
+                                if (err) return reject(err);
+
+                                // If this is the only enabled module, prevent disabling
+                                if (countRow.enabledCount <= 1) {
+                                    return reject(new Error('Cannot disable module - at least one module must remain enabled'));
+                                }
+
+                                // Proceed with the update
+                                this.db.run(
+                                    `UPDATE module_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE module_id = ?`,
+                                    [enabled ? 1 : 0, moduleId],
+                                    function(err) {
+                                        if (err) reject(err);
+                                        else resolve();
+                                    }
+                                );
+                            }
+                        );
+                    } else {
+                        // Proceed with enabling the module
+                        this.db.run(
+                            `UPDATE module_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE module_id = ?`,
+                            [enabled ? 1 : 0, moduleId],
+                            function(err) {
+                                if (err) reject(err);
+                                else resolve();
+                            }
+                        );
+                    }
+                }
+            );
+        });
+    }
+
+    async updateModuleConfig(moduleId, config) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `UPDATE module_settings SET config = ?, updated_at = CURRENT_TIMESTAMP WHERE module_id = ?`,
+                [JSON.stringify(config), moduleId],
+                function(err) {
+                    if (err) reject(err);
+                    else if (this.changes === 0) {
+                        reject(new Error(`Module '${moduleId}' not found`));
+                    } else {
+                        resolve();
+                    }
+                }
+            );
         });
     }
 }

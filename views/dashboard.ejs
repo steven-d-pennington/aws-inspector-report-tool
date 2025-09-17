@@ -14,142 +14,172 @@
                 <li><a href="/">Upload</a></li>
                 <li><a href="/dashboard" class="active">Dashboard</a></li>
                 <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                <li><a href="/settings">Settings</a></li>
             </ul>
         </div>
     </nav>
 
     <div class="container">
-        <div class="dashboard-header">
-            <h2>Vulnerability Summary</h2>
-            <p>Last updated: <%= new Date().toLocaleString() %></p>
-        </div>
-
-        <div class="summary-cards">
-            <a href="/vulnerabilities?groupByCVE=true" class="summary-card-link">
-                <div class="summary-card total">
-                    <div class="card-icon">📊</div>
-                    <div class="card-content">
-                        <h3>Total Vulnerabilities</h3>
-                        <p class="card-value"><%= summary.total %></p>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/vulnerabilities?severity=CRITICAL&groupByCVE=true" class="summary-card-link">
-                <div class="summary-card critical">
-                    <div class="card-icon">🔴</div>
-                    <div class="card-content">
-                        <h3>Critical</h3>
-                        <p class="card-value"><%= summary.critical %></p>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/vulnerabilities?severity=HIGH&groupByCVE=true" class="summary-card-link">
-                <div class="summary-card high">
-                    <div class="card-icon">🟠</div>
-                    <div class="card-content">
-                        <h3>High</h3>
-                        <p class="card-value"><%= summary.high %></p>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/vulnerabilities?severity=MEDIUM&groupByCVE=true" class="summary-card-link">
-                <div class="summary-card medium">
-                    <div class="card-icon">🟡</div>
-                    <div class="card-content">
-                        <h3>Medium</h3>
-                        <p class="card-value"><%= summary.medium %></p>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/vulnerabilities?severity=LOW&groupByCVE=true" class="summary-card-link">
-                <div class="summary-card low">
-                    <div class="card-icon">🟢</div>
-                    <div class="card-content">
-                        <h3>Low</h3>
-                        <p class="card-value"><%= summary.low %></p>
-                    </div>
-                </div>
-            </a>
-
-            <a href="/vulnerabilities?fixAvailable=YES&groupByCVE=true" class="summary-card-link">
-                <div class="summary-card fixable">
-                    <div class="card-icon">✅</div>
-                    <div class="card-content">
-                        <h3>Fixable</h3>
-                        <p class="card-value"><%= summary.fixable %></p>
-                        <p class="card-subtitle"><%= summary.total > 0 ? Math.round(summary.fixable / summary.total * 100) : 0 %>% can be fixed</p>
-                    </div>
-                </div>
-            </a>
-        </div>
-
-        <div class="dashboard-section">
-            <h3>Quick Actions</h3>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="location.href='/vulnerabilities?severity=CRITICAL'">
-                    View Critical Vulnerabilities
-                </button>
-                <button class="btn btn-success" onclick="location.href='/vulnerabilities?fixAvailable=YES'">
-                    View Fixable Issues
-                </button>
-                <button class="btn btn-info" onclick="location.href='/vulnerabilities'">
-                    View All Vulnerabilities
-                </button>
-                <button class="btn btn-secondary" onclick="location.href='/'">
-                    Upload New Report
-                </button>
+        <!-- Include tabs navigation -->
+        <%- include('partials/tabs', {
+            modules: [
+                {
+                    id: 'aws-inspector',
+                    name: 'AWS Inspector',
+                    icon: '🔍',
+                    enabled: true,
+                    displayOrder: 1,
+                    route: '/dashboard',
+                    status: 'active'
+                },
+                {
+                    id: 'sbom',
+                    name: 'SBOM Analysis',
+                    icon: '📦',
+                    enabled: true,
+                    displayOrder: 2,
+                    route: '/sbom',
+                    status: 'coming-soon'
+                }
+            ],
+            activeModule: 'aws-inspector',
+            context: { hasSettings: true }
+        }) %>
+        <!-- Dashboard Content Container -->
+        <div class="dashboard-content">
+            <div class="dashboard-header">
+                <h2>Vulnerability Summary</h2>
+                <p>Last updated: <%= new Date().toLocaleString() %></p>
             </div>
-        </div>
 
-        <div class="dashboard-section">
-            <h3>Recent Reports</h3>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Filename</th>
-                        <th>Upload Date</th>
-                        <th>Account ID</th>
-                        <th>Vulnerabilities</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (recentReports && recentReports.length > 0) { %>
-                        <% recentReports.forEach(report => { %>
-                            <tr>
-                                <td><%= report.filename %></td>
-                                <td><%= new Date(report.upload_date).toLocaleString() %></td>
-                                <td><%= report.aws_account_id || 'N/A' %></td>
-                                <td><%= report.vulnerability_count %></td>
-                                <td>
-                                    <button class="btn btn-small btn-danger" onclick="deleteReport(<%= report.id %>)">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        <% }) %>
-                    <% } else { %>
+            <div class="summary-cards">
+                <a href="/vulnerabilities?groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card total">
+                        <div class="card-icon">📊</div>
+                        <div class="card-content">
+                            <h3>Total Vulnerabilities</h3>
+                            <p class="card-value"><%= summary.total %></p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="/vulnerabilities?severity=CRITICAL&groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card critical">
+                        <div class="card-icon">🔴</div>
+                        <div class="card-content">
+                            <h3>Critical</h3>
+                            <p class="card-value"><%= summary.critical %></p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="/vulnerabilities?severity=HIGH&groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card high">
+                        <div class="card-icon">🟠</div>
+                        <div class="card-content">
+                            <h3>High</h3>
+                            <p class="card-value"><%= summary.high %></p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="/vulnerabilities?severity=MEDIUM&groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card medium">
+                        <div class="card-icon">🟡</div>
+                        <div class="card-content">
+                            <h3>Medium</h3>
+                            <p class="card-value"><%= summary.medium %></p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="/vulnerabilities?severity=LOW&groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card low">
+                        <div class="card-icon">🟢</div>
+                        <div class="card-content">
+                            <h3>Low</h3>
+                            <p class="card-value"><%= summary.low %></p>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="/vulnerabilities?fixAvailable=YES&groupByCVE=true" class="summary-card-link">
+                    <div class="summary-card fixable">
+                        <div class="card-icon">✅</div>
+                        <div class="card-content">
+                            <h3>Fixable</h3>
+                            <p class="card-value"><%= summary.fixable %></p>
+                            <p class="card-subtitle"><%= summary.total > 0 ? Math.round(summary.fixable / summary.total * 100) : 0 %>% can be fixed</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Quick Actions</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="location.href='/vulnerabilities?severity=CRITICAL'">
+                        View Critical Vulnerabilities
+                    </button>
+                    <button class="btn btn-success" onclick="location.href='/vulnerabilities?fixAvailable=YES'">
+                        View Fixable Issues
+                    </button>
+                    <button class="btn btn-info" onclick="location.href='/vulnerabilities'">
+                        View All Vulnerabilities
+                    </button>
+                    <button class="btn btn-secondary" onclick="location.href='/'">
+                        Upload New Report
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Recent Reports</h3>
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td colspan="5" class="text-center">No reports uploaded yet</td>
+                            <th>Filename</th>
+                            <th>Upload Date</th>
+                            <th>Account ID</th>
+                            <th>Vulnerabilities</th>
+                            <th>Actions</th>
                         </tr>
-                    <% } %>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="dashboard-section">
-            <h3>Distribution by Severity</h3>
-            <div class="chart-container">
-                <canvas id="severityChart"></canvas>
+                    </thead>
+                    <tbody>
+                        <% if (recentReports && recentReports.length > 0) { %>
+                            <% recentReports.forEach(report => { %>
+                                <tr>
+                                    <td><%= report.filename %></td>
+                                    <td><%= new Date(report.upload_date).toLocaleString() %></td>
+                                    <td><%= report.aws_account_id || 'N/A' %></td>
+                                    <td><%= report.vulnerability_count %></td>
+                                    <td>
+                                        <button class="btn btn-small btn-danger" onclick="deleteReport(<%= report.id %>)">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="5" class="text-center">No reports uploaded yet</td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
             </div>
-        </div>
+
+            <div class="dashboard-section">
+                <h3>Distribution by Severity</h3>
+                <div class="chart-container">
+                    <canvas id="severityChart"></canvas>
+                </div>
+            </div>
+        </div> <!-- End Dashboard Content Container -->
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/tabs.js"></script>
     <script>
         const summary = <%- JSON.stringify(summary) %>;
 

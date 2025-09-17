@@ -1,0 +1,355 @@
+openapi: 3.0.0
+info:
+  title: Settings API
+  version: 1.0.0
+  description: API for managing application and module settings
+
+paths:
+  /api/settings:
+    get:
+      summary: Get all application settings
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        value:
+                          oneOf:
+                            - type: string
+                            - type: boolean
+                            - type: number
+                            - type: object
+                        type:
+                          type: string
+                          enum: [string, boolean, number, json]
+                        description:
+                          type: string
+              example:
+                settings:
+                  app_title:
+                    value: "AWS Security Dashboard"
+                    type: "string"
+                    description: "Application title"
+                  theme:
+                    value: "light"
+                    type: "string"
+                    description: "UI theme"
+                  auto_refresh:
+                    value: false
+                    type: "boolean"
+                    description: "Auto-refresh dashboard"
+
+    put:
+      summary: Update application settings
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: boolean
+                      - type: number
+                      - type: object
+              required:
+                - settings
+            example:
+              settings:
+                theme: "dark"
+                auto_refresh: true
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  updated:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid settings data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/modules:
+    get:
+      summary: Get all available modules
+      operationId: getModules
+      responses:
+        '200':
+          description: Modules retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Module'
+              example:
+                modules:
+                  - module_id: "aws-inspector"
+                    name: "AWS Inspector"
+                    description: "AWS Inspector vulnerability reports"
+                    enabled: true
+                    is_default: true
+                    display_order: 1
+                    route: "/"
+                  - module_id: "sbom"
+                    name: "SBOM Reports"
+                    description: "Software Bill of Materials reports"
+                    enabled: false
+                    is_default: false
+                    display_order: 2
+                    route: "/sbom"
+
+  /api/modules/{moduleId}/toggle:
+    put:
+      summary: Enable or disable a module
+      operationId: toggleModule
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Module identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+              required:
+                - enabled
+      responses:
+        '200':
+          description: Module toggled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  module:
+                    $ref: '#/components/schemas/Module'
+        '400':
+          description: Cannot disable module
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Module not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/modules/{moduleId}/config:
+    get:
+      summary: Get module configuration
+      operationId: getModuleConfig
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module configuration retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config:
+                    type: object
+                    additionalProperties: true
+        '404':
+          description: Module not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update module configuration
+      operationId: updateModuleConfig
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  additionalProperties: true
+              required:
+                - config
+      responses:
+        '200':
+          description: Module configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  config:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Module not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/modules/reorder:
+    put:
+      summary: Reorder module tabs
+      operationId: reorderModules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      module_id:
+                        type: string
+                      display_order:
+                        type: integer
+                    required:
+                      - module_id
+                      - display_order
+              required:
+                - order
+      responses:
+        '200':
+          description: Modules reordered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Module'
+        '400':
+          description: Invalid order data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Module:
+      type: object
+      properties:
+        module_id:
+          type: string
+          description: Unique module identifier
+        name:
+          type: string
+          description: Display name
+        description:
+          type: string
+          description: Module description
+        enabled:
+          type: boolean
+          description: Whether module is enabled
+        is_default:
+          type: boolean
+          description: Whether module is the default
+        display_order:
+          type: integer
+          description: Display order in tab bar
+        config:
+          type: object
+          description: Module-specific configuration
+        icon:
+          type: string
+          description: Icon class or path
+        route:
+          type: string
+          description: Base route path
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - module_id
+        - name
+        - enabled
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+      required:
+        - error

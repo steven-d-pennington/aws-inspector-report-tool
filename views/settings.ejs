@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Settings</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <ul class="nav-links">
+                <li><a href="/">Upload</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                <li><a href="/settings" class="active">Settings</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Success/Error Messages -->
+        <div id="messageArea" class="message-area" style="display: none;">
+            <div id="messageContent" class="message-content"></div>
+        </div>
+
+        <!-- Application Settings Section -->
+        <div class="settings-section">
+            <h2>Application Settings</h2>
+            <form id="settingsForm" class="settings-form">
+                <div class="settings-grid">
+                    <div class="setting-group">
+                        <label for="theme">Theme</label>
+                        <select id="theme" name="theme" aria-label="Select application theme">
+                            <option value="light" <%= (settings && settings.theme === 'light') ? 'selected' : '' %>>Light</option>
+                            <option value="dark" <%= (settings && settings.theme === 'dark') ? 'selected' : '' %>>Dark</option>
+                            <option value="auto" <%= (!settings || settings.theme === 'auto') ? 'selected' : '' %>>Auto</option>
+                        </select>
+                        <small class="setting-description">Choose your preferred interface theme</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="autoRefresh">Auto Refresh Dashboard</label>
+                        <select id="autoRefresh" name="auto_refresh" aria-label="Auto refresh dashboard interval">
+                            <option value="0" <%= (!settings || settings.auto_refresh === 0) ? 'selected' : '' %>>Disabled</option>
+                            <option value="30" <%= (settings && settings.auto_refresh === 30) ? 'selected' : '' %>>30 seconds</option>
+                            <option value="60" <%= (settings && settings.auto_refresh === 60) ? 'selected' : '' %>>1 minute</option>
+                            <option value="300" <%= (settings && settings.auto_refresh === 300) ? 'selected' : '' %>>5 minutes</option>
+                            <option value="600" <%= (settings && settings.auto_refresh === 600) ? 'selected' : '' %>>10 minutes</option>
+                        </select>
+                        <small class="setting-description">Automatically refresh dashboard data</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="itemsPerPage">Items Per Page</label>
+                        <select id="itemsPerPage" name="items_per_page" aria-label="Number of items to display per page">
+                            <option value="10" <%= (settings && settings.items_per_page === 10) ? 'selected' : '' %>>10</option>
+                            <option value="25" <%= (!settings || settings.items_per_page === 25) ? 'selected' : '' %>>25</option>
+                            <option value="50" <%= (settings && settings.items_per_page === 50) ? 'selected' : '' %>>50</option>
+                            <option value="100" <%= (settings && settings.items_per_page === 100) ? 'selected' : '' %>>100</option>
+                        </select>
+                        <small class="setting-description">Number of vulnerabilities to show per page</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="defaultGrouping">Default Vulnerability Grouping</label>
+                        <select id="defaultGrouping" name="default_grouping" aria-label="Default grouping for vulnerabilities">
+                            <option value="false" <%= (!settings || settings.default_grouping === false) ? 'selected' : '' %>>Individual Findings</option>
+                            <option value="true" <%= (settings && settings.default_grouping === true) ? 'selected' : '' %>>Group by CVE</option>
+                        </select>
+                        <small class="setting-description">How vulnerabilities are displayed by default</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="exportFormat">Default Export Format</label>
+                        <select id="exportFormat" name="export_format" aria-label="Default format for vulnerability exports">
+                            <option value="pdf" <%= (!settings || settings.export_format === 'pdf') ? 'selected' : '' %>>PDF</option>
+                            <option value="csv" <%= (settings && settings.export_format === 'csv') ? 'selected' : '' %>>CSV</option>
+                            <option value="json" <%= (settings && settings.export_format === 'json') ? 'selected' : '' %>>JSON</option>
+                            <option value="notion" <%= (settings && settings.export_format === 'notion') ? 'selected' : '' %>>Notion</option>
+                        </select>
+                        <small class="setting-description">Preferred format for exporting data</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="retentionDays">Data Retention (Days)</label>
+                        <select id="retentionDays" name="retention_days" aria-label="Number of days to retain vulnerability data">
+                            <option value="30" <%= (settings && settings.retention_days === 30) ? 'selected' : '' %>>30 days</option>
+                            <option value="60" <%= (settings && settings.retention_days === 60) ? 'selected' : '' %>>60 days</option>
+                            <option value="90" <%= (!settings || settings.retention_days === 90) ? 'selected' : '' %>>90 days</option>
+                            <option value="180" <%= (settings && settings.retention_days === 180) ? 'selected' : '' %>>180 days</option>
+                            <option value="365" <%= (settings && settings.retention_days === 365) ? 'selected' : '' %>>1 year</option>
+                            <option value="0" <%= (settings && settings.retention_days === 0) ? 'selected' : '' %>>Never delete</option>
+                        </select>
+                        <small class="setting-description">How long to keep uploaded reports and vulnerability data</small>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Module Management Section -->
+        <div class="settings-section">
+            <h2>Module Management</h2>
+            <p class="section-description">Enable or disable different vulnerability scanning modules</p>
+
+            <div class="modules-grid">
+                <!-- AWS Inspector Module (Default/Required) -->
+                <div class="module-card locked">
+                    <div class="module-header">
+                        <div class="module-info">
+                            <h3>AWS Inspector</h3>
+                            <span class="module-badge required">Required</span>
+                        </div>
+                        <div class="module-toggle">
+                            <div class="toggle-switch disabled" aria-label="AWS Inspector module is required and cannot be disabled">
+                                <input type="checkbox" id="aws-inspector" name="aws_inspector" checked disabled>
+                                <label for="aws-inspector" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="module-description">
+                        <p>Core vulnerability scanning using AWS Inspector reports. This module is required and cannot be disabled.</p>
+                        <div class="module-status">
+                            <span class="status-indicator active"></span>
+                            <span class="status-text">Active - Required Module</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SBOM Module -->
+                <div class="module-card">
+                    <div class="module-header">
+                        <div class="module-info">
+                            <h3>SBOM (Software Bill of Materials)</h3>
+                            <span class="module-badge optional">Optional</span>
+                        </div>
+                        <div class="module-toggle">
+                            <div class="toggle-switch" aria-label="Toggle SBOM module">
+                                <input type="checkbox" id="sbom" name="sbom" <%= (modules && modules.sbom) ? 'checked' : '' %>>
+                                <label for="sbom" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="module-description">
+                        <p>Analyze Software Bill of Materials (SBOM) files to identify component vulnerabilities and dependencies.</p>
+                        <div class="module-status">
+                            <span class="status-indicator <%= (modules && modules.sbom) ? 'active' : 'inactive' %>" id="sbom-status"></span>
+                            <span class="status-text" id="sbom-status-text">
+                                <%= (modules && modules.sbom) ? 'Active' : 'Inactive' %>
+                            </span>
+                        </div>
+                        <div class="module-features">
+                            <h4>Features:</h4>
+                            <ul>
+                                <li>SPDX format support</li>
+                                <li>CycloneDX format support</li>
+                                <li>Dependency vulnerability mapping</li>
+                                <li>License compliance checking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container Scanning Module (Future) -->
+                <div class="module-card disabled">
+                    <div class="module-header">
+                        <div class="module-info">
+                            <h3>Container Scanning</h3>
+                            <span class="module-badge coming-soon">Coming Soon</span>
+                        </div>
+                        <div class="module-toggle">
+                            <div class="toggle-switch disabled" aria-label="Container scanning module coming soon">
+                                <input type="checkbox" id="container-scanning" name="container_scanning" disabled>
+                                <label for="container-scanning" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="module-description">
+                        <p>Scan container images for vulnerabilities and compliance issues. This module is in development.</p>
+                        <div class="module-status">
+                            <span class="status-indicator coming-soon"></span>
+                            <span class="status-text">Coming Soon</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Scanning Module (Future) -->
+                <div class="module-card disabled">
+                    <div class="module-header">
+                        <div class="module-info">
+                            <h3>Static Code Analysis</h3>
+                            <span class="module-badge coming-soon">Coming Soon</span>
+                        </div>
+                        <div class="module-toggle">
+                            <div class="toggle-switch disabled" aria-label="Static code analysis module coming soon">
+                                <input type="checkbox" id="code-scanning" name="code_scanning" disabled>
+                                <label for="code-scanning" class="toggle-label">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="module-description">
+                        <p>Perform static analysis on source code to identify security vulnerabilities and coding issues.</p>
+                        <div class="module-status">
+                            <span class="status-indicator coming-soon"></span>
+                            <span class="status-text">Coming Soon</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="settings-actions">
+            <button type="button" class="btn btn-primary" onclick="saveSettings()" id="saveBtn">
+                <span class="btn-icon">💾</span>
+                Save Settings
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="resetSettings()" id="resetBtn">
+                <span class="btn-icon">🔄</span>
+                Reset to Defaults
+            </button>
+            <button type="button" class="btn btn-info" onclick="exportSettings()" id="exportBtn">
+                <span class="btn-icon">📤</span>
+                Export Settings
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="importSettings()" id="importBtn">
+                <span class="btn-icon">📥</span>
+                Import Settings
+            </button>
+        </div>
+
+        <!-- Hidden file input for settings import -->
+        <input type="file" id="settingsFileInput" accept=".json" style="display: none;" onchange="handleSettingsImport(event)">
+
+        <!-- Advanced Settings Section -->
+        <div class="settings-section advanced-section">
+            <h2>Advanced Settings</h2>
+            <div class="advanced-toggle">
+                <button type="button" class="btn btn-secondary" onclick="toggleAdvancedSettings()" id="advancedToggle">
+                    <span class="btn-icon">⚙️</span>
+                    Show Advanced Settings
+                </button>
+            </div>
+
+            <div id="advancedSettings" class="advanced-settings" style="display: none;">
+                <div class="settings-grid">
+                    <div class="setting-group">
+                        <label for="debugMode">Debug Mode</label>
+                        <select id="debugMode" name="debug_mode" aria-label="Enable debug mode for troubleshooting">
+                            <option value="false" <%= (!settings || settings.debug_mode === false) ? 'selected' : '' %>>Disabled</option>
+                            <option value="true" <%= (settings && settings.debug_mode === true) ? 'selected' : '' %>>Enabled</option>
+                        </select>
+                        <small class="setting-description">Enable detailed logging for troubleshooting (may impact performance)</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="apiTimeout">API Timeout (seconds)</label>
+                        <input type="number" id="apiTimeout" name="api_timeout" min="5" max="300"
+                               value="<%= (settings && settings.api_timeout) ? settings.api_timeout : 30 %>"
+                               aria-label="API request timeout in seconds">
+                        <small class="setting-description">Maximum time to wait for API responses (5-300 seconds)</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="cacheTimeout">Cache Timeout (minutes)</label>
+                        <input type="number" id="cacheTimeout" name="cache_timeout" min="1" max="1440"
+                               value="<%= (settings && settings.cache_timeout) ? settings.cache_timeout : 15 %>"
+                               aria-label="Cache timeout in minutes">
+                        <small class="setting-description">How long to cache vulnerability data (1-1440 minutes)</small>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="maxUploadSize">Max Upload Size (MB)</label>
+                        <input type="number" id="maxUploadSize" name="max_upload_size" min="1" max="500"
+                               value="<%= (settings && settings.max_upload_size) ? settings.max_upload_size : 50 %>"
+                               aria-label="Maximum file upload size in megabytes">
+                        <small class="setting-description">Maximum size for uploaded report files (1-500 MB)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Settings form handling
+        let isAdvancedVisible = false;
+
+        // Initialize settings page
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeToggles();
+            loadCurrentSettings();
+        });
+
+        // Initialize toggle switches
+        function initializeToggles() {
+            const toggles = document.querySelectorAll('.toggle-switch input[type="checkbox"]:not([disabled])');
+            toggles.forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    updateModuleStatus(this);
+                });
+            });
+        }
+
+        // Update module status indicators
+        function updateModuleStatus(toggle) {
+            const moduleCard = toggle.closest('.module-card');
+            const statusIndicator = moduleCard.querySelector('.status-indicator');
+            const statusText = moduleCard.querySelector('.status-text');
+
+            if (toggle.checked) {
+                statusIndicator.className = 'status-indicator active';
+                statusText.textContent = 'Active';
+                moduleCard.classList.remove('inactive');
+            } else {
+                statusIndicator.className = 'status-indicator inactive';
+                statusText.textContent = 'Inactive';
+                moduleCard.classList.add('inactive');
+            }
+        }
+
+        // Save settings
+        async function saveSettings() {
+            const saveBtn = document.getElementById('saveBtn');
+            const originalText = saveBtn.innerHTML;
+
+            try {
+                saveBtn.innerHTML = '<span class="btn-icon">⏳</span>Saving...';
+                saveBtn.disabled = true;
+
+                const formData = new FormData(document.getElementById('settingsForm'));
+                const settings = {};
+                const modules = {};
+
+                // Collect form data
+                for (let [key, value] of formData.entries()) {
+                    if (key === 'sbom' || key === 'aws_inspector' || key === 'container_scanning' || key === 'code_scanning') {
+                        modules[key] = true;
+                    } else {
+                        // Convert string values to appropriate types
+                        if (value === 'true') settings[key] = true;
+                        else if (value === 'false') settings[key] = false;
+                        else if (!isNaN(value) && value !== '') settings[key] = parseInt(value);
+                        else settings[key] = value;
+                    }
+                }
+
+                // Handle unchecked checkboxes
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]:not([disabled])');
+                checkboxes.forEach(cb => {
+                    if (!cb.checked && (cb.name === 'sbom' || cb.name.includes('_'))) {
+                        if (cb.name === 'sbom') {
+                            modules[cb.name] = false;
+                        }
+                    }
+                });
+
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ settings, modules })
+                });
+
+                if (response.ok) {
+                    showMessage('Settings saved successfully!', 'success');
+                } else {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showMessage('Error saving settings: ' + error.message, 'error');
+            } finally {
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Reset settings to defaults
+        async function resetSettings() {
+            if (!confirm('Are you sure you want to reset all settings to their default values?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/settings/reset', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    showMessage('Settings reset to defaults successfully!', 'success');
+                    // Reload page to show default values
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error('Failed to reset settings');
+                }
+            } catch (error) {
+                console.error('Error resetting settings:', error);
+                showMessage('Error resetting settings: ' + error.message, 'error');
+            }
+        }
+
+        // Export settings
+        function exportSettings() {
+            const settings = {};
+            const modules = {};
+            const formData = new FormData(document.getElementById('settingsForm'));
+
+            for (let [key, value] of formData.entries()) {
+                if (key === 'sbom' || key === 'aws_inspector') {
+                    modules[key] = true;
+                } else {
+                    if (value === 'true') settings[key] = true;
+                    else if (value === 'false') settings[key] = false;
+                    else if (!isNaN(value) && value !== '') settings[key] = parseInt(value);
+                    else settings[key] = value;
+                }
+            }
+
+            const exportData = {
+                settings,
+                modules,
+                exported_at: new Date().toISOString(),
+                version: '1.0'
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vulnerability-dashboard-settings-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('Settings exported successfully!', 'success');
+        }
+
+        // Import settings
+        function importSettings() {
+            document.getElementById('settingsFileInput').click();
+        }
+
+        // Handle settings file import
+        function handleSettingsImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importData = JSON.parse(e.target.result);
+
+                    if (!importData.settings && !importData.modules) {
+                        throw new Error('Invalid settings file format');
+                    }
+
+                    // Apply imported settings to form
+                    if (importData.settings) {
+                        Object.entries(importData.settings).forEach(([key, value]) => {
+                            const element = document.querySelector(`[name="${key}"]`);
+                            if (element) {
+                                if (element.type === 'checkbox') {
+                                    element.checked = value;
+                                } else {
+                                    element.value = value;
+                                }
+                            }
+                        });
+                    }
+
+                    if (importData.modules) {
+                        Object.entries(importData.modules).forEach(([key, value]) => {
+                            const element = document.querySelector(`[name="${key}"]`);
+                            if (element && !element.disabled) {
+                                element.checked = value;
+                                updateModuleStatus(element);
+                            }
+                        });
+                    }
+
+                    showMessage('Settings imported successfully! Remember to save your changes.', 'success');
+                } catch (error) {
+                    console.error('Error importing settings:', error);
+                    showMessage('Error importing settings: Invalid file format', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Toggle advanced settings
+        function toggleAdvancedSettings() {
+            const advancedSettings = document.getElementById('advancedSettings');
+            const toggleBtn = document.getElementById('advancedToggle');
+
+            isAdvancedVisible = !isAdvancedVisible;
+
+            if (isAdvancedVisible) {
+                advancedSettings.style.display = 'block';
+                toggleBtn.innerHTML = '<span class="btn-icon">⚙️</span>Hide Advanced Settings';
+            } else {
+                advancedSettings.style.display = 'none';
+                toggleBtn.innerHTML = '<span class="btn-icon">⚙️</span>Show Advanced Settings';
+            }
+        }
+
+        // Load current settings (placeholder for server-side data)
+        function loadCurrentSettings() {
+            // This would typically load current settings from the server
+            // For now, the values are populated via EJS templating
+        }
+
+        // Show message to user
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('messageArea');
+            const messageContent = document.getElementById('messageContent');
+
+            messageContent.innerHTML = `
+                <div class="message ${type}">
+                    <span class="message-icon">${type === 'success' ? '✅' : '❌'}</span>
+                    <span class="message-text">${message}</span>
+                    <button class="message-close" onclick="hideMessage()">×</button>
+                </div>
+            `;
+
+            messageArea.style.display = 'block';
+
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(hideMessage, 5000);
+            }
+        }
+
+        // Hide message
+        function hideMessage() {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.style.display = 'none';
+        }
+
+        // Form validation
+        document.getElementById('settingsForm').addEventListener('input', function(e) {
+            if (e.target.type === 'number') {
+                const min = parseInt(e.target.min);
+                const max = parseInt(e.target.max);
+                const value = parseInt(e.target.value);
+
+                if (value < min || value > max) {
+                    e.target.setCustomValidity(`Value must be between ${min} and ${max}`);
+                } else {
+                    e.target.setCustomValidity('');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

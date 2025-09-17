@@ -1,0 +1,908 @@
+const ModuleSettings = require('../models/moduleSettings');
+
+/**
+ * ModuleService - Business logic layer for module management
+ *
+ * Provides comprehensive module management functionality including:
+ * - Module state management (enable/disable/toggle)
+ * - Configuration validation and updates
+ * - Module ordering and display management
+ * - Business rule enforcement (default module protection, minimum enabled modules)
+ * - Module dependency checking and resolution
+ * - Audit logging for all module changes
+ * - Integration with module registry for lifecycle management
+ *
+ * All methods include comprehensive error handling and validation
+ */
+class ModuleService {
+    constructor() {
+        this.moduleSettings = new ModuleSettings();
+        this.moduleRegistry = new Map(); // In-memory registry for module lifecycle management
+        this.auditLog = []; // Simple in-memory audit log (could be replaced with database logging)
+        this.isInitialized = false;
+    }
+
+    /**
+     * Initialize the module service and underlying database
+     * @returns {Promise<void>}
+     */
+    async initialize() {
+        try {
+            await this.moduleSettings.initialize();
+            await this._initializeModuleRegistry();
+            this.isInitialized = true;
+            this._logAuditEvent('service_initialized', 'system', { timestamp: new Date().toISOString() });
+        } catch (error) {
+            throw new Error(`Failed to initialize ModuleService: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get all modules with their current state and configuration
+     * @returns {Promise<Array>} Array of all module objects
+     */
+    async getModules() {
+        try {
+            this._ensureInitialized();
+            const modules = await this.moduleSettings.getAllModules();
+
+            // Enhance modules with runtime state from registry
+            return modules.map(module => this._enrichModuleWithRegistryData(module));
+        } catch (error) {
+            throw new Error(`Failed to get modules: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get only enabled modules ordered by display_order
+     * @returns {Promise<Array>} Array of enabled module objects
+     */
+    async getEnabledModules() {
+        try {
+            this._ensureInitialized();
+            const modules = await this.moduleSettings.getEnabledModules();
+
+            // Enhance modules with runtime state from registry
+            return modules.map(module => this._enrichModuleWithRegistryData(module));
+        } catch (error) {
+            throw new Error(`Failed to get enabled modules: ${error.message}`);
+        }
+    }
+
+    /**
+     * Toggle a module's enabled state with comprehensive validation
+     * @param {string} moduleId - The module identifier
+     * @param {boolean} enabled - The desired enabled state
+     * @param {string} [userId='system'] - User making the change for audit purposes
+     * @returns {Promise<Object>} Updated module object
+     */
+    async toggleModule(moduleId, enabled, userId = 'system') {
+        try {
+            this._ensureInitialized();
+            this._validateModuleId(moduleId);
+            this._validateBoolean(enabled, 'enabled');
+
+            // Get current module state
+            const currentModule = await this.moduleSettings.getModule(moduleId);
+            if (!currentModule) {
+                throw new Error(`Module '${moduleId}' not found`);
+            }
+
+            // Check if state change is needed
+            if (currentModule.enabled === enabled) {
+                this._logAuditEvent('module_toggle_no_change', userId, {
+                    moduleId,
+                    enabled,
+                    reason: 'Already in requested state'
+                });
+                return this._enrichModuleWithRegistryData(currentModule);
+            }
+
+            // Validate business rules before making changes
+            await this._validateToggleOperation(moduleId, enabled, currentModule);
+
+            // Check module dependencies
+            await this._validateModuleDependencies(moduleId, enabled);
+
+            // Perform the toggle operation
+            if (enabled) {
+                await this.moduleSettings.enableModule(moduleId);
+                await this._handleModuleEnable(moduleId);
+            } else {
+                await this.moduleSettings.disableModule(moduleId);
+                await this._handleModuleDisable(moduleId);
+            }
+
+            // Get updated module state
+            const updatedModule = await this.moduleSettings.getModule(moduleId);
+            const enrichedModule = this._enrichModuleWithRegistryData(updatedModule);
+
+            // Log the successful change
+            this._logAuditEvent('module_toggled', userId, {
+                moduleId,
+                previousState: currentModule.enabled,
+                newState: enabled,
+                module: enrichedModule
+            });
+
+            return enrichedModule;
+        } catch (error) {
+            this._logAuditEvent('module_toggle_error', userId, {
+                moduleId,
+                enabled,
+                error: error.message
+            });
+            throw new Error(`Failed to toggle module '${moduleId}': ${error.message}`);
+        }
+    }
+
+    /**
+     * Update module configuration with validation
+     * @param {string} moduleId - The module identifier
+     * @param {Object} config - New configuration object
+     * @param {string} [userId='system'] - User making the change for audit purposes
+     * @returns {Promise<Object>} Updated module object
+     */
+    async updateModuleConfig(moduleId, config, userId = 'system') {
+        try {
+            this._ensureInitialized();
+            this._validateModuleId(moduleId);
+
+            // Get current module to ensure it exists
+            const currentModule = await this.moduleSettings.getModule(moduleId);
+            if (!currentModule) {
+                throw new Error(`Module '${moduleId}' not found`);
+            }
+
+            // Validate configuration for this module type
+            const validatedConfig = await this._validateModuleConfiguration(moduleId, config);
+
+            // Check for configuration conflicts
+            await this._validateConfigurationConflicts(moduleId, validatedConfig);
+
+            // Update the configuration
+            await this.moduleSettings.updateModuleConfig(moduleId, validatedConfig);
+
+            // Handle configuration change in registry
+            await this._handleConfigurationChange(moduleId, validatedConfig);
+
+            // Get updated module state
+            const updatedModule = await this.moduleSettings.getModule(moduleId);
+            const enrichedModule = this._enrichModuleWithRegistryData(updatedModule);
+
+            // Log the configuration change
+            this._logAuditEvent('module_config_updated', userId, {
+                moduleId,
+                previousConfig: currentModule.config,
+                newConfig: validatedConfig,
+                module: enrichedModule
+            });
+
+            return enrichedModule;
+        } catch (error) {
+            this._logAuditEvent('module_config_error', userId, {
+                moduleId,
+                config,
+                error: error.message
+            });
+            throw new Error(`Failed to update configuration for module '${moduleId}': ${error.message}`);
+        }
+    }
+
+    /**
+     * Reorder modules by updating display_order
+     * @param {Array<string>} orderArray - Array of module_ids in desired order
+     * @param {string} [userId='system'] - User making the change for audit purposes
+     * @returns {Promise<Array>} Updated modules in new order
+     */
+    async reorderModules(orderArray, userId = 'system') {
+        try {
+            this._ensureInitialized();
+            this._validateOrderArray(orderArray);
+
+            // Get current module order for audit
+            const currentModules = await this.moduleSettings.getModulesByOrder();
+            const currentOrder = currentModules.map(m => m.module_id);
+
+            // Validate that all provided module IDs exist
+            await this._validateModuleIdsExist(orderArray);
+
+            // Check for conflicts in reordering
+            await this._validateReorderConflicts(orderArray);
+
+            // Perform the reorder operation
+            await this.moduleSettings.reorderModules(orderArray);
+
+            // Handle reorder in registry
+            await this._handleModuleReorder(orderArray);
+
+            // Get updated modules in new order
+            const updatedModules = await this.moduleSettings.getModulesByOrder();
+            const enrichedModules = updatedModules.map(module => this._enrichModuleWithRegistryData(module));
+
+            // Log the reorder operation
+            this._logAuditEvent('modules_reordered', userId, {
+                previousOrder: currentOrder,
+                newOrder: orderArray,
+                affectedModules: enrichedModules.length
+            });
+
+            return enrichedModules;
+        } catch (error) {
+            this._logAuditEvent('module_reorder_error', userId, {
+                orderArray,
+                error: error.message
+            });
+            throw new Error(`Failed to reorder modules: ${error.message}`);
+        }
+    }
+
+    /**
+     * Reorder modules using order array with module_id and display_order objects
+     * This method follows the OpenAPI specification contract for /api/modules/reorder
+     * @param {Array<{module_id: string, display_order: number}>} orderData - Array of objects with module_id and display_order
+     * @param {string} [userId='system'] - User making the change for audit purposes
+     * @returns {Promise<Array>} Updated modules in new order
+     */
+    async reorderModulesWithOrder(orderData, userId = 'system') {
+        try {
+            this._ensureInitialized();
+            this._validateOrderData(orderData);
+
+            // Get current module order for audit
+            const currentModules = await this.moduleSettings.getModulesByOrder();
+            const currentOrder = currentModules.map(m => ({
+                module_id: m.module_id,
+                display_order: m.display_order
+            }));
+
+            // Validate that all provided module IDs exist
+            const moduleIds = orderData.map(item => item.module_id);
+            await this._validateModuleIdsExist(moduleIds);
+
+            // Validate display_order values
+            await this._validateDisplayOrderValues(orderData);
+
+            // Check for conflicts in reordering
+            await this._validateReorderConflicts(moduleIds);
+
+            // Sort by display_order to ensure proper ordering
+            const sortedOrderData = [...orderData].sort((a, b) => a.display_order - b.display_order);
+
+            // Perform the reorder operation with transaction support
+            await this._reorderModulesWithTransaction(sortedOrderData);
+
+            // Handle reorder in registry
+            await this._handleModuleReorder(moduleIds);
+
+            // Get updated modules in new order
+            const updatedModules = await this.moduleSettings.getModulesByOrder();
+            const enrichedModules = updatedModules.map(module => this._enrichModuleWithRegistryData(module));
+
+            // Log the reorder operation
+            this._logAuditEvent('modules_reordered_with_order', userId, {
+                previousOrder: currentOrder,
+                newOrder: orderData,
+                affectedModules: enrichedModules.length
+            });
+
+            return enrichedModules;
+        } catch (error) {
+            this._logAuditEvent('module_reorder_with_order_error', userId, {
+                orderData,
+                error: error.message
+            });
+            throw new Error(`Failed to reorder modules: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get audit log entries for module changes
+     * @param {Object} [filters] - Optional filters for audit log
+     * @param {string} [filters.userId] - Filter by user ID
+     * @param {string} [filters.moduleId] - Filter by module ID
+     * @param {string} [filters.action] - Filter by action type
+     * @param {Date} [filters.startDate] - Filter by start date
+     * @param {Date} [filters.endDate] - Filter by end date
+     * @returns {Array} Filtered audit log entries
+     */
+    getAuditLog(filters = {}) {
+        try {
+            let filteredLog = [...this.auditLog];
+
+            if (filters.userId) {
+                filteredLog = filteredLog.filter(entry => entry.userId === filters.userId);
+            }
+
+            if (filters.moduleId) {
+                filteredLog = filteredLog.filter(entry =>
+                    entry.details && entry.details.moduleId === filters.moduleId
+                );
+            }
+
+            if (filters.action) {
+                filteredLog = filteredLog.filter(entry => entry.action === filters.action);
+            }
+
+            if (filters.startDate) {
+                filteredLog = filteredLog.filter(entry =>
+                    new Date(entry.timestamp) >= filters.startDate
+                );
+            }
+
+            if (filters.endDate) {
+                filteredLog = filteredLog.filter(entry =>
+                    new Date(entry.timestamp) <= filters.endDate
+                );
+            }
+
+            return filteredLog.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        } catch (error) {
+            throw new Error(`Failed to get audit log: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get module dependency information
+     * @param {string} moduleId - The module identifier
+     * @returns {Promise<Object>} Module dependency information
+     */
+    async getModuleDependencies(moduleId) {
+        try {
+            this._ensureInitialized();
+            this._validateModuleId(moduleId);
+
+            const module = await this.moduleSettings.getModule(moduleId);
+            if (!module) {
+                throw new Error(`Module '${moduleId}' not found`);
+            }
+
+            const registryEntry = this.moduleRegistry.get(moduleId);
+
+            return {
+                moduleId,
+                dependencies: registryEntry?.dependencies || [],
+                dependents: this._getModuleDependents(moduleId),
+                canBeDisabled: await this._canModuleBeDisabled(moduleId),
+                conflicts: await this._getModuleConflicts(moduleId)
+            };
+        } catch (error) {
+            throw new Error(`Failed to get dependencies for module '${moduleId}': ${error.message}`);
+        }
+    }
+
+    /**
+     * Validate module configuration without saving
+     * @param {string} moduleId - The module identifier
+     * @param {Object} config - Configuration to validate
+     * @returns {Promise<Object>} Validation result with any errors
+     */
+    async validateConfiguration(moduleId, config) {
+        try {
+            this._ensureInitialized();
+            this._validateModuleId(moduleId);
+
+            const module = await this.moduleSettings.getModule(moduleId);
+            if (!module) {
+                throw new Error(`Module '${moduleId}' not found`);
+            }
+
+            const validatedConfig = await this._validateModuleConfiguration(moduleId, config);
+            const conflicts = await this._checkConfigurationConflicts(moduleId, validatedConfig);
+
+            return {
+                valid: conflicts.length === 0,
+                config: validatedConfig,
+                conflicts,
+                warnings: this._getConfigurationWarnings(moduleId, validatedConfig)
+            };
+        } catch (error) {
+            return {
+                valid: false,
+                error: error.message,
+                config: null,
+                conflicts: [],
+                warnings: []
+            };
+        }
+    }
+
+    // ============ PRIVATE METHODS ============
+
+    /**
+     * Initialize the module registry with known modules
+     * @private
+     */
+    async _initializeModuleRegistry() {
+        // Initialize registry with default module configurations
+        this.moduleRegistry.set('aws-inspector', {
+            dependencies: [],
+            conflicts: [],
+            configSchema: {
+                type: 'object',
+                properties: {
+                    autoRefresh: { type: 'boolean', default: true },
+                    refreshInterval: { type: 'number', minimum: 30, default: 300 }
+                }
+            }
+        });
+
+        this.moduleRegistry.set('sbom', {
+            dependencies: [],
+            conflicts: [],
+            configSchema: {
+                type: 'object',
+                properties: {
+                    format: { type: 'string', enum: ['json', 'xml', 'csv'], default: 'json' },
+                    includeDevDependencies: { type: 'boolean', default: false }
+                }
+            }
+        });
+    }
+
+    /**
+     * Ensure the service is initialized before operations
+     * @private
+     */
+    _ensureInitialized() {
+        if (!this.isInitialized) {
+            throw new Error('ModuleService must be initialized before use');
+        }
+    }
+
+    /**
+     * Validate module ID format and presence
+     * @private
+     */
+    _validateModuleId(moduleId) {
+        if (!moduleId || typeof moduleId !== 'string') {
+            throw new Error('Module ID must be a non-empty string');
+        }
+        if (!/^[a-z0-9-_]+$/i.test(moduleId)) {
+            throw new Error('Module ID contains invalid characters');
+        }
+    }
+
+    /**
+     * Validate boolean values
+     * @private
+     */
+    _validateBoolean(value, fieldName) {
+        if (typeof value !== 'boolean') {
+            throw new Error(`${fieldName} must be a boolean value`);
+        }
+    }
+
+    /**
+     * Validate module order array
+     * @private
+     */
+    _validateOrderArray(orderArray) {
+        if (!Array.isArray(orderArray)) {
+            throw new Error('Order array must be an array');
+        }
+        if (orderArray.length === 0) {
+            throw new Error('Order array cannot be empty');
+        }
+
+        const uniqueIds = new Set(orderArray);
+        if (uniqueIds.size !== orderArray.length) {
+            throw new Error('Order array cannot contain duplicate module IDs');
+        }
+
+        orderArray.forEach(id => this._validateModuleId(id));
+    }
+
+    /**
+     * Validate order data array for reorderModulesWithOrder
+     * @private
+     */
+    _validateOrderData(orderData) {
+        if (!Array.isArray(orderData)) {
+            throw new Error('Order data must be an array');
+        }
+        if (orderData.length === 0) {
+            throw new Error('Order data cannot be empty');
+        }
+
+        // Check for duplicates in module_id
+        const moduleIds = orderData.map(item => item.module_id);
+        const uniqueIds = new Set(moduleIds);
+        if (uniqueIds.size !== moduleIds.length) {
+            throw new Error('Order data cannot contain duplicate module IDs');
+        }
+
+        // Check for duplicates in display_order
+        const displayOrders = orderData.map(item => item.display_order);
+        const uniqueOrders = new Set(displayOrders);
+        if (uniqueOrders.size !== displayOrders.length) {
+            throw new Error('Order data cannot contain duplicate display_order values');
+        }
+
+        // Validate each order item
+        orderData.forEach((item, index) => {
+            if (!item || typeof item !== 'object') {
+                throw new Error(`Order item at index ${index} must be an object`);
+            }
+            if (!item.module_id || typeof item.module_id !== 'string') {
+                throw new Error(`Order item at index ${index} must have a valid module_id string`);
+            }
+            if (typeof item.display_order !== 'number' || !Number.isInteger(item.display_order)) {
+                throw new Error(`Order item at index ${index} must have a valid display_order integer`);
+            }
+            if (item.display_order < 1) {
+                throw new Error(`Order item at index ${index} display_order must be at least 1`);
+            }
+
+            // Validate module_id format
+            this._validateModuleId(item.module_id);
+        });
+    }
+
+    /**
+     * Validate display order values
+     * @private
+     */
+    async _validateDisplayOrderValues(orderData) {
+        // Ensure display_order values are reasonable and sequential
+        const sortedOrders = orderData.map(item => item.display_order).sort((a, b) => a - b);
+
+        // Check for reasonable range (positive integers)
+        if (sortedOrders.some(order => order < 1)) {
+            throw new Error('All display_order values must be positive integers');
+        }
+
+        // Optional: Check for reasonable maximum (prevents extreme values)
+        const maxOrder = Math.max(...sortedOrders);
+        if (maxOrder > 1000) {
+            throw new Error('Display order values must be 1000 or less');
+        }
+    }
+
+    /**
+     * Perform module reordering with transaction support
+     * @private
+     */
+    async _reorderModulesWithTransaction(sortedOrderData) {
+        // Use the existing moduleSettings reorderModules method with proper ordering
+        const moduleIdsInOrder = sortedOrderData.map(item => item.module_id);
+        await this.moduleSettings.reorderModules(moduleIdsInOrder);
+    }
+
+    /**
+     * Validate toggle operation business rules
+     * @private
+     */
+    async _validateToggleOperation(moduleId, enabled, currentModule) {
+        // Cannot disable default modules
+        if (!enabled && currentModule.is_default) {
+            throw new Error(`Cannot disable default module '${moduleId}'`);
+        }
+
+        // Must maintain at least one enabled module
+        if (!enabled) {
+            const enabledCount = await this._getEnabledModuleCount();
+            if (enabledCount <= 1) {
+                throw new Error('Cannot disable module - at least one module must remain enabled');
+            }
+        }
+    }
+
+    /**
+     * Validate module dependencies before state changes
+     * @private
+     */
+    async _validateModuleDependencies(moduleId, enabled) {
+        const registryEntry = this.moduleRegistry.get(moduleId);
+
+        if (enabled && registryEntry?.dependencies) {
+            // Check if all dependencies are enabled
+            for (const depId of registryEntry.dependencies) {
+                const depModule = await this.moduleSettings.getModule(depId);
+                if (!depModule || !depModule.enabled) {
+                    throw new Error(`Cannot enable '${moduleId}' - dependency '${depId}' is not enabled`);
+                }
+            }
+        }
+
+        if (!enabled) {
+            // Check if any enabled modules depend on this one
+            const dependents = this._getModuleDependents(moduleId);
+            const enabledDependents = [];
+
+            for (const depId of dependents) {
+                const depModule = await this.moduleSettings.getModule(depId);
+                if (depModule && depModule.enabled) {
+                    enabledDependents.push(depId);
+                }
+            }
+
+            if (enabledDependents.length > 0) {
+                throw new Error(`Cannot disable '${moduleId}' - modules depend on it: ${enabledDependents.join(', ')}`);
+            }
+        }
+    }
+
+    /**
+     * Validate module configuration against schema
+     * @private
+     */
+    async _validateModuleConfiguration(moduleId, config) {
+        if (config === null || config === undefined) {
+            return null;
+        }
+
+        if (typeof config !== 'object') {
+            throw new Error('Configuration must be an object');
+        }
+
+        const registryEntry = this.moduleRegistry.get(moduleId);
+        if (registryEntry?.configSchema) {
+            // Basic schema validation (could be enhanced with a proper JSON schema validator)
+            return this._validateAgainstSchema(config, registryEntry.configSchema);
+        }
+
+        // Return config as-is if no schema defined
+        return config;
+    }
+
+    /**
+     * Basic schema validation
+     * @private
+     */
+    _validateAgainstSchema(config, schema) {
+        if (schema.type === 'object' && schema.properties) {
+            const validated = {};
+
+            for (const [key, propSchema] of Object.entries(schema.properties)) {
+                if (config.hasOwnProperty(key)) {
+                    validated[key] = this._validateProperty(config[key], propSchema, key);
+                } else if (propSchema.default !== undefined) {
+                    validated[key] = propSchema.default;
+                }
+            }
+
+            return validated;
+        }
+
+        return config;
+    }
+
+    /**
+     * Validate individual property against schema
+     * @private
+     */
+    _validateProperty(value, schema, propertyName) {
+        if (schema.type === 'boolean' && typeof value !== 'boolean') {
+            throw new Error(`Property '${propertyName}' must be a boolean`);
+        }
+
+        if (schema.type === 'number' && typeof value !== 'number') {
+            throw new Error(`Property '${propertyName}' must be a number`);
+        }
+
+        if (schema.type === 'string' && typeof value !== 'string') {
+            throw new Error(`Property '${propertyName}' must be a string`);
+        }
+
+        if (schema.enum && !schema.enum.includes(value)) {
+            throw new Error(`Property '${propertyName}' must be one of: ${schema.enum.join(', ')}`);
+        }
+
+        if (schema.minimum !== undefined && value < schema.minimum) {
+            throw new Error(`Property '${propertyName}' must be at least ${schema.minimum}`);
+        }
+
+        return value;
+    }
+
+    /**
+     * Check for configuration conflicts
+     * @private
+     */
+    async _validateConfigurationConflicts(moduleId, config) {
+        const conflicts = await this._checkConfigurationConflicts(moduleId, config);
+        if (conflicts.length > 0) {
+            throw new Error(`Configuration conflicts detected: ${conflicts.join(', ')}`);
+        }
+    }
+
+    /**
+     * Check for configuration conflicts without throwing
+     * @private
+     */
+    async _checkConfigurationConflicts(moduleId, config) {
+        const conflicts = [];
+
+        // Check for port conflicts, resource conflicts, etc.
+        // This is a placeholder for more sophisticated conflict detection
+
+        return conflicts;
+    }
+
+    /**
+     * Get configuration warnings
+     * @private
+     */
+    _getConfigurationWarnings(moduleId, config) {
+        const warnings = [];
+
+        // Generate warnings for potentially problematic configurations
+        // This is a placeholder for more sophisticated warning generation
+
+        return warnings;
+    }
+
+    /**
+     * Validate that all module IDs exist
+     * @private
+     */
+    async _validateModuleIdsExist(moduleIds) {
+        for (const moduleId of moduleIds) {
+            const module = await this.moduleSettings.getModule(moduleId);
+            if (!module) {
+                throw new Error(`Module '${moduleId}' not found`);
+            }
+        }
+    }
+
+    /**
+     * Validate reorder conflicts
+     * @private
+     */
+    async _validateReorderConflicts(orderArray) {
+        // Check for any conflicts that would prevent reordering
+        // This is a placeholder for more sophisticated conflict checking
+    }
+
+    /**
+     * Get count of enabled modules
+     * @private
+     */
+    async _getEnabledModuleCount() {
+        const enabledModules = await this.moduleSettings.getEnabledModules();
+        return enabledModules.length;
+    }
+
+    /**
+     * Get modules that depend on the given module
+     * @private
+     */
+    _getModuleDependents(moduleId) {
+        const dependents = [];
+
+        for (const [id, entry] of this.moduleRegistry.entries()) {
+            if (entry.dependencies && entry.dependencies.includes(moduleId)) {
+                dependents.push(id);
+            }
+        }
+
+        return dependents;
+    }
+
+    /**
+     * Check if a module can be disabled
+     * @private
+     */
+    async _canModuleBeDisabled(moduleId) {
+        const module = await this.moduleSettings.getModule(moduleId);
+        if (!module) return false;
+
+        // Cannot disable default modules
+        if (module.is_default) return false;
+
+        // Cannot disable if it would leave no enabled modules
+        const enabledCount = await this._getEnabledModuleCount();
+        if (module.enabled && enabledCount <= 1) return false;
+
+        // Cannot disable if other modules depend on it
+        const dependents = this._getModuleDependents(moduleId);
+        for (const depId of dependents) {
+            const depModule = await this.moduleSettings.getModule(depId);
+            if (depModule && depModule.enabled) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get module conflicts
+     * @private
+     */
+    async _getModuleConflicts(moduleId) {
+        const registryEntry = this.moduleRegistry.get(moduleId);
+        return registryEntry?.conflicts || [];
+    }
+
+    /**
+     * Enrich module data with registry information
+     * @private
+     */
+    _enrichModuleWithRegistryData(module) {
+        const registryEntry = this.moduleRegistry.get(module.module_id);
+
+        return {
+            ...module,
+            dependencies: registryEntry?.dependencies || [],
+            conflicts: registryEntry?.conflicts || [],
+            hasConfigSchema: !!(registryEntry?.configSchema)
+        };
+    }
+
+    /**
+     * Handle module enable lifecycle
+     * @private
+     */
+    async _handleModuleEnable(moduleId) {
+        // Trigger module enable events
+        // This could notify other parts of the system
+        this._logAuditEvent('module_enable_lifecycle', 'system', {
+            moduleId,
+            action: 'enabled'
+        });
+    }
+
+    /**
+     * Handle module disable lifecycle
+     * @private
+     */
+    async _handleModuleDisable(moduleId) {
+        // Trigger module disable events
+        // This could clean up resources, notify other parts of the system
+        this._logAuditEvent('module_disable_lifecycle', 'system', {
+            moduleId,
+            action: 'disabled'
+        });
+    }
+
+    /**
+     * Handle configuration change lifecycle
+     * @private
+     */
+    async _handleConfigurationChange(moduleId, config) {
+        // Trigger configuration change events
+        this._logAuditEvent('module_config_lifecycle', 'system', {
+            moduleId,
+            action: 'config_updated',
+            config
+        });
+    }
+
+    /**
+     * Handle module reorder lifecycle
+     * @private
+     */
+    async _handleModuleReorder(orderArray) {
+        // Trigger reorder events
+        this._logAuditEvent('module_reorder_lifecycle', 'system', {
+            action: 'reordered',
+            newOrder: orderArray
+        });
+    }
+
+    /**
+     * Log audit events
+     * @private
+     */
+    _logAuditEvent(action, userId, details) {
+        const auditEntry = {
+            id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            timestamp: new Date().toISOString(),
+            action,
+            userId,
+            details: { ...details }
+        };
+
+        this.auditLog.push(auditEntry);
+
+        // Keep only last 1000 entries to prevent memory leaks
+        if (this.auditLog.length > 1000) {
+            this.auditLog = this.auditLog.slice(-1000);
+        }
+
+        // In production, this would likely write to a database or external logging service
+        console.log(`[AUDIT] ${action} by ${userId}:`, details);
+    }
+}
+
+module.exports = ModuleService;

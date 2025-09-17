@@ -1,0 +1,779 @@
+<%
+/*
+ * Dynamic Tab Navigation Partial
+ *
+ * This partial renders a dynamic tabbed navigation interface based on enabled modules.
+ * It follows the existing design system and provides comprehensive accessibility support.
+ *
+ * Required data parameters:
+ * - modules: Array of enabled modules with display order
+ * - activeModule: Currently active module ID
+ * - context: Additional context for tab rendering (optional)
+ *
+ * Module object structure:
+ * - id: Module identifier
+ * - name: Display name
+ * - icon: Icon or emoji for the module
+ * - enabled: Boolean indicating if module is enabled
+ * - displayOrder: Sort order for tabs
+ * - route: URL route for the module (optional)
+ * - badge: Badge information { count, type, text } (optional)
+ * - status: Module status (active, disabled, loading, error, coming-soon) (optional)
+ *
+ * Features:
+ * - Dynamic tab navigation bar with module tabs
+ * - Full accessibility with ARIA roles and labels
+ * - Keyboard navigation support
+ * - Screen reader compatibility
+ * - Responsive design with existing CSS classes
+ * - Support for disabled/coming soon modules
+ * - Tab badges for notifications/counts
+ * - Edge case handling (no modules, single module)
+ * - JavaScript interaction data attributes
+ */
+
+// Process and validate modules data
+const processModules = (modules, activeModule, context) => {
+    if (!modules || !Array.isArray(modules)) {
+        return { enabledModules: [], activeModuleId: null, hasModules: false };
+    }
+
+    // Filter enabled modules and sort by display order
+    const enabledModules = modules
+        .filter(m => m && m.enabled !== false)
+        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+        .map((module, index) => ({
+            id: module.id || module.module_id || `module-${index}`,
+            name: module.name || 'Unknown Module',
+            icon: module.icon || '📦',
+            route: module.route || `/${module.id || module.module_id}`,
+            badge: module.badge || null,
+            status: module.status || 'active',
+            enabled: module.status !== 'disabled' && module.status !== 'coming-soon',
+            loadUrl: module.loadUrl || null,
+            index: index
+        }));
+
+    const activeModuleId = activeModule || (enabledModules.length > 0 ? enabledModules[0].id : null);
+
+    return {
+        enabledModules,
+        activeModuleId,
+        hasModules: enabledModules.length > 0,
+        context: context || {}
+    };
+};
+
+// Generate accessibility IDs
+const getTabId = (moduleId) => `tab-${moduleId}`;
+const getPanelId = (moduleId) => `panel-${moduleId}`;
+
+// Get badge class based on type
+const getBadgeClass = (badge) => {
+    if (!badge) return '';
+    const baseClass = 'tab-badge';
+    if (badge.type) {
+        return `${baseClass} ${baseClass}-${badge.type}`;
+    }
+    return baseClass;
+};
+
+// Get tab item classes
+const getTabItemClass = (module, isActive) => {
+    let classes = ['tab-nav-item'];
+
+    if (isActive) classes.push('active');
+    if (!module.enabled) classes.push('disabled');
+    if (module.status === 'loading') classes.push('loading');
+    if (module.status === 'error') classes.push('error');
+    if (module.status === 'coming-soon') classes.push('coming-soon');
+
+    return classes.join(' ');
+};
+
+// Process the data
+const { enabledModules, activeModuleId, hasModules, context } = processModules(modules, activeModule, context);
+%>
+
+<% if (hasModules) { %>
+<!-- Tab Navigation Container -->
+<div class="tab-container" role="navigation" aria-label="Module Navigation">
+    <!-- Tab Navigation Bar -->
+    <div class="tab-nav-wrapper">
+        <div class="tab-nav" role="tablist" aria-label="Available Modules" data-tab-count="<%= enabledModules.length %>">
+            <% enabledModules.forEach((module) => {
+                const isActive = module.id === activeModuleId;
+                const tabId = getTabId(module.id);
+                const panelId = getPanelId(module.id);
+                const tabClasses = getTabItemClass(module, isActive);
+            %>
+            <button
+                class="<%= tabClasses %>"
+                role="tab"
+                id="<%= tabId %>"
+                aria-controls="<%= panelId %>"
+                aria-selected="<%= isActive ? 'true' : 'false' %>"
+                tabindex="<%= isActive ? '0' : '-1' %>"
+                data-module-id="<%= module.id %>"
+                data-tab-trigger="<%= module.id %>"
+                data-tab-content="<%= module.id %>"
+                data-route="<%= module.route %>"
+                data-load-url="<%= module.loadUrl || '' %>"
+                data-status="<%= module.status %>"
+                data-index="<%= module.index %>"
+                <%= !module.enabled ? 'disabled' : '' %>
+                aria-describedby="<%= module.badge ? `${tabId}-badge` : '' %>"
+            >
+                <!-- Tab Icon -->
+                <span class="tab-icon" aria-hidden="true"><%= module.icon %></span>
+
+                <!-- Tab Label -->
+                <span class="tab-text"><%= module.name %></span>
+
+                <!-- Tab Badge (if present) -->
+                <% if (module.badge) { %>
+                <span
+                    class="<%= getBadgeClass(module.badge) %>"
+                    id="<%= tabId %>-badge"
+                    aria-label="<%= module.badge.text || `${module.badge.count} notifications` %>"
+                    <% if (module.badge.count !== undefined) { %>
+                    data-count="<%= module.badge.count %>"
+                    <% } %>
+                >
+                    <%= module.badge.count !== undefined ? module.badge.count : (module.badge.text || '') %>
+                </span>
+                <% } %>
+
+                <!-- Loading indicator for loading state -->
+                <% if (module.status === 'loading') { %>
+                <span class="tab-loading-indicator" aria-hidden="true"></span>
+                <% } %>
+
+                <!-- Screen reader status text -->
+                <% if (isActive) { %>
+                <span class="sr-only">(current)</span>
+                <% } %>
+                <% if (!module.enabled) { %>
+                <span class="sr-only">(disabled)</span>
+                <% } %>
+                <% if (module.status === 'coming-soon') { %>
+                <span class="sr-only">(coming soon)</span>
+                <% } %>
+            </button>
+            <% }); %>
+        </div>
+
+        <!-- Scroll indicators for mobile -->
+        <div class="tab-nav-scroll-indicator left" aria-hidden="true"></div>
+        <div class="tab-nav-scroll-indicator right" aria-hidden="true"></div>
+    </div>
+
+    <!-- Tab Content Panels -->
+    <div class="tab-content" role="main">
+        <% enabledModules.forEach((module) => {
+            const isActive = module.id === activeModuleId;
+            const tabId = getTabId(module.id);
+            const panelId = getPanelId(module.id);
+        %>
+        <div
+            class="tab-pane <%= isActive ? 'active' : '' %>"
+            role="tabpanel"
+            id="<%= panelId %>"
+            aria-labelledby="<%= tabId %>"
+            data-tab-content="<%= module.id %>"
+            data-module-id="<%= module.id %>"
+            data-status="<%= module.status %>"
+            <%= !isActive ? 'hidden' : '' %>
+            aria-live="polite"
+        >
+            <!-- Loading state -->
+            <% if (module.status === 'loading') { %>
+            <div class="tab-content-loader" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
+                <div class="loading-text">Loading <%= module.name %>...</div>
+            </div>
+            <% } else if (module.status === 'error') { %>
+            <!-- Error state -->
+            <div class="tab-error-state" role="alert">
+                <h3>Error Loading <%= module.name %></h3>
+                <p>There was a problem loading this module. Please try again.</p>
+                <button class="btn btn-secondary" onclick="retryModule('<%= module.id %>')">
+                    Retry
+                </button>
+            </div>
+            <% } else if (module.status === 'coming-soon') { %>
+            <!-- Coming soon state -->
+            <div class="tab-coming-soon" role="status">
+                <h3><%= module.name %> - Coming Soon</h3>
+                <p>This module is currently under development and will be available soon.</p>
+            </div>
+            <% } else { %>
+            <!-- Default content container - will be populated by JavaScript or server-side rendering -->
+            <div class="tab-default-content">
+                <!-- Module content will be loaded here -->
+                <div class="tab-placeholder" aria-live="polite">
+                    <span class="sr-only">Loading <%= module.name %> content...</span>
+                </div>
+            </div>
+            <% } %>
+        </div>
+        <% }); %>
+    </div>
+</div>
+
+<!-- Edge Cases -->
+<% } else if (modules && modules.length === 1) { %>
+<!-- Single Module - Show simplified interface -->
+<div class="single-module-nav" role="navigation" aria-label="Single Module">
+    <div class="single-module-header">
+        <span class="single-module-icon" aria-hidden="true"><%= modules[0].icon || '📦' %></span>
+        <h2 class="single-module-title"><%= modules[0].name || 'Module' %></h2>
+        <% if (modules[0].badge) { %>
+        <span class="<%= getBadgeClass(modules[0].badge) %>" aria-label="<%= modules[0].badge.text || `${modules[0].badge.count} notifications` %>">
+            <%= modules[0].badge.count !== undefined ? modules[0].badge.count : (modules[0].badge.text || '') %>
+        </span>
+        <% } %>
+    </div>
+    <div class="single-module-content" role="main">
+        <!-- Single module content will be loaded here -->
+    </div>
+</div>
+
+<% } else { %>
+<!-- No Modules Available -->
+<div class="no-modules-available" role="alert" aria-live="polite">
+    <div class="no-modules-icon" aria-hidden="true">📋</div>
+    <h3 class="no-modules-title">No Modules Available</h3>
+    <p class="no-modules-message">
+        No modules are currently enabled or available.
+        <% if (context && context.hasSettings !== false) { %>
+        Please check your <a href="/settings" class="settings-link">settings</a> to enable modules.
+        <% } else { %>
+        Please contact your administrator to configure modules.
+        <% } %>
+    </p>
+</div>
+<% } %>
+
+<!-- Minimal Style Overrides for Integration -->
+<style>
+/* Ensure compatibility with existing tab CSS classes from style.css */
+.tab-container {
+    position: relative;
+}
+
+/* Single module styling */
+.single-module-nav {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+    padding: 24px;
+}
+
+.single-module-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.single-module-icon {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.single-module-title {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #495057;
+    flex: 1;
+}
+
+.single-module-content {
+    min-height: 200px;
+}
+
+/* No modules styling */
+.no-modules-available {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    color: #6c757d;
+    margin-bottom: 24px;
+}
+
+.no-modules-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+}
+
+.no-modules-title {
+    margin: 0 0 12px 0;
+    font-size: 1.25rem;
+    color: #495057;
+}
+
+.no-modules-message {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.settings-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.settings-link:hover {
+    text-decoration: underline;
+}
+
+/* Screen reader only content */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Tab error states */
+.tab-error-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #dc3545;
+}
+
+.tab-error-state h3 {
+    margin: 0 0 12px 0;
+    color: #dc3545;
+}
+
+.tab-error-state p {
+    margin: 0 0 24px 0;
+    color: #6c757d;
+}
+
+.tab-coming-soon {
+    text-align: center;
+    padding: 48px 24px;
+    color: #6c757d;
+}
+
+.tab-coming-soon h3 {
+    margin: 0 0 12px 0;
+    color: #495057;
+}
+
+.tab-coming-soon p {
+    margin: 0;
+}
+
+/* Loading state enhancements */
+.tab-loading-indicator {
+    width: 12px;
+    height: 12px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Accessibility enhancements */
+@media (prefers-reduced-motion: reduce) {
+    .tab-loading-indicator {
+        animation: none;
+    }
+
+    .tab-loading-indicator::after {
+        content: "...";
+        position: absolute;
+        margin-left: -6px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .no-modules-available {
+        border-color: currentColor;
+    }
+
+    .single-module-header {
+        border-bottom-color: currentColor;
+    }
+}
+</style>
+
+<script>
+/**
+ * Enhanced Tab Navigation JavaScript
+ * Handles tab switching, keyboard navigation, accessibility, and integration with existing TabManager
+ */
+
+// Check if TabManager from tabs.js is available and initialize compatibility layer
+(function() {
+    'use strict';
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeTabNavigation);
+    } else {
+        initializeTabNavigation();
+    }
+
+    function initializeTabNavigation() {
+        // Create ARIA live region for announcements if it doesn't exist
+        ensureAnnouncer();
+
+        // Set up event delegation for tab interactions
+        setupTabInteractions();
+
+        // Set up keyboard navigation
+        setupKeyboardNavigation();
+
+        // Update scroll indicators for mobile
+        updateScrollIndicators();
+
+        // Integration with existing TabManager if available
+        integrateWithTabManager();
+    }
+
+    /**
+     * Ensure ARIA live region exists for announcements
+     */
+    function ensureAnnouncer() {
+        if (!document.getElementById('tab-announcements')) {
+            const announcer = document.createElement('div');
+            announcer.id = 'tab-announcements';
+            announcer.setAttribute('aria-live', 'polite');
+            announcer.setAttribute('aria-atomic', 'true');
+            announcer.className = 'sr-only';
+            document.body.appendChild(announcer);
+        }
+    }
+
+    /**
+     * Set up tab interaction handlers
+     */
+    function setupTabInteractions() {
+        // Use event delegation for tab clicks
+        document.addEventListener('click', function(event) {
+            const tabButton = event.target.closest('.tab-nav-item');
+            if (tabButton && !tabButton.disabled) {
+                event.preventDefault();
+                handleTabActivation(tabButton);
+            }
+        });
+    }
+
+    /**
+     * Set up keyboard navigation
+     */
+    function setupKeyboardNavigation() {
+        document.addEventListener('keydown', function(event) {
+            const tabButton = event.target.closest('.tab-nav-item');
+            if (!tabButton) return;
+
+            const tabNav = tabButton.closest('.tab-nav');
+            const allTabs = Array.from(tabNav.querySelectorAll('.tab-nav-item:not([disabled])'));
+            const currentIndex = allTabs.indexOf(tabButton);
+
+            let targetIndex = null;
+
+            switch (event.key) {
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                    event.preventDefault();
+                    targetIndex = currentIndex > 0 ? currentIndex - 1 : allTabs.length - 1;
+                    break;
+
+                case 'ArrowRight':
+                case 'ArrowDown':
+                    event.preventDefault();
+                    targetIndex = currentIndex < allTabs.length - 1 ? currentIndex + 1 : 0;
+                    break;
+
+                case 'Home':
+                    event.preventDefault();
+                    targetIndex = 0;
+                    break;
+
+                case 'End':
+                    event.preventDefault();
+                    targetIndex = allTabs.length - 1;
+                    break;
+
+                case 'Enter':
+                case ' ':
+                    event.preventDefault();
+                    handleTabActivation(tabButton);
+                    return;
+
+                default:
+                    return;
+            }
+
+            if (targetIndex !== null && allTabs[targetIndex]) {
+                // Move focus to target tab
+                allTabs[targetIndex].focus();
+
+                // Update tabindex for proper tab order
+                allTabs.forEach((tab, index) => {
+                    tab.setAttribute('tabindex', index === targetIndex ? '0' : '-1');
+                });
+            }
+        });
+    }
+
+    /**
+     * Handle tab activation
+     */
+    function handleTabActivation(tabButton) {
+        const moduleId = tabButton.getAttribute('data-module-id');
+        const route = tabButton.getAttribute('data-route');
+        const loadUrl = tabButton.getAttribute('data-load-url');
+        const tabText = tabButton.querySelector('.tab-text').textContent;
+
+        // Check if this should trigger navigation or local tab switch
+        if (route && window.location.pathname !== route) {
+            // Navigate to different route
+            window.location.href = route;
+            return;
+        }
+
+        // Local tab activation
+        activateTab(tabButton, moduleId);
+
+        // Load content if needed
+        if (loadUrl) {
+            loadTabContent(moduleId, loadUrl);
+        }
+
+        // Announce change
+        announceTabChange(tabText);
+
+        // Trigger custom events for integration
+        triggerTabChangeEvent(moduleId, tabButton);
+    }
+
+    /**
+     * Activate a specific tab
+     */
+    function activateTab(activeTabButton, moduleId) {
+        const tabContainer = activeTabButton.closest('.tab-container');
+        const tabNav = activeTabButton.closest('.tab-nav');
+
+        // Update all tab buttons
+        tabNav.querySelectorAll('.tab-nav-item').forEach(tab => {
+            const isActive = tab === activeTabButton;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            tab.setAttribute('tabindex', isActive ? '0' : '-1');
+        });
+
+        // Update all tab panels
+        const tabContent = tabContainer.querySelector('.tab-content');
+        if (tabContent) {
+            tabContent.querySelectorAll('.tab-pane').forEach(panel => {
+                const isActive = panel.getAttribute('data-module-id') === moduleId;
+                panel.classList.toggle('active', isActive);
+
+                if (isActive) {
+                    panel.removeAttribute('hidden');
+                    panel.setAttribute('aria-hidden', 'false');
+                } else {
+                    panel.setAttribute('hidden', '');
+                    panel.setAttribute('aria-hidden', 'true');
+                }
+            });
+        }
+    }
+
+    /**
+     * Load tab content dynamically
+     */
+    function loadTabContent(moduleId, loadUrl) {
+        const tabPane = document.querySelector(`[data-tab-content="${moduleId}"]`);
+        if (!tabPane) return;
+
+        // Show loading state
+        showLoadingState(tabPane);
+
+        // Fetch content
+        fetch(loadUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            hideLoadingState(tabPane);
+            const contentContainer = tabPane.querySelector('.tab-default-content') || tabPane;
+            contentContainer.innerHTML = html;
+        })
+        .catch(error => {
+            hideLoadingState(tabPane);
+            showErrorState(tabPane, error.message);
+        });
+    }
+
+    /**
+     * Show loading state for tab pane
+     */
+    function showLoadingState(tabPane) {
+        tabPane.classList.add('loading');
+        const placeholder = tabPane.querySelector('.tab-placeholder');
+        if (placeholder) {
+            placeholder.innerHTML = '<div class="tab-content-loader"><div class="spinner"></div><div class="loading-text">Loading content...</div></div>';
+        }
+    }
+
+    /**
+     * Hide loading state for tab pane
+     */
+    function hideLoadingState(tabPane) {
+        tabPane.classList.remove('loading');
+    }
+
+    /**
+     * Show error state for tab pane
+     */
+    function showErrorState(tabPane, errorMessage) {
+        const moduleId = tabPane.getAttribute('data-module-id');
+        tabPane.innerHTML = `
+            <div class="tab-error-state" role="alert">
+                <h3>Error Loading Content</h3>
+                <p>${escapeHtml(errorMessage)}</p>
+                <button class="btn btn-secondary" onclick="retryModule('${moduleId}')">
+                    Retry
+                </button>
+            </div>
+        `;
+    }
+
+    /**
+     * Announce tab changes to screen readers
+     */
+    function announceTabChange(tabText) {
+        const announcer = document.getElementById('tab-announcements');
+        if (announcer) {
+            announcer.textContent = `Switched to ${tabText} tab`;
+            setTimeout(() => {
+                announcer.textContent = '';
+            }, 1000);
+        }
+    }
+
+    /**
+     * Trigger custom tab change event
+     */
+    function triggerTabChangeEvent(moduleId, tabButton) {
+        const event = new CustomEvent('tabChange', {
+            detail: {
+                moduleId: moduleId,
+                tabElement: tabButton,
+                timestamp: Date.now()
+            },
+            bubbles: true
+        });
+        document.dispatchEvent(event);
+    }
+
+    /**
+     * Update scroll indicators for mobile
+     */
+    function updateScrollIndicators() {
+        const tabNavs = document.querySelectorAll('.tab-nav');
+
+        tabNavs.forEach(tabNav => {
+            const wrapper = tabNav.closest('.tab-nav-wrapper');
+            if (!wrapper) return;
+
+            const leftIndicator = wrapper.querySelector('.tab-nav-scroll-indicator.left');
+            const rightIndicator = wrapper.querySelector('.tab-nav-scroll-indicator.right');
+
+            function updateIndicators() {
+                const canScrollLeft = tabNav.scrollLeft > 0;
+                const canScrollRight = tabNav.scrollLeft < (tabNav.scrollWidth - tabNav.clientWidth);
+
+                leftIndicator.classList.toggle('visible', canScrollLeft);
+                rightIndicator.classList.toggle('visible', canScrollRight);
+            }
+
+            tabNav.addEventListener('scroll', updateIndicators);
+            window.addEventListener('resize', updateIndicators);
+            updateIndicators();
+        });
+    }
+
+    /**
+     * Integration with existing TabManager
+     */
+    function integrateWithTabManager() {
+        if (window.tabManager && typeof window.tabManager.switchTab === 'function') {
+            // Listen for custom tab change events and sync with TabManager
+            document.addEventListener('tabChange', function(event) {
+                try {
+                    window.tabManager.switchTab(event.detail.moduleId, 'api');
+                } catch (error) {
+                    console.warn('Could not sync with TabManager:', error);
+                }
+            });
+        }
+    }
+
+    /**
+     * Utility function to escape HTML
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Global functions for backwards compatibility and external access
+    window.retryModule = function(moduleId) {
+        const tabButton = document.querySelector(`[data-module-id="${moduleId}"]`);
+        if (tabButton) {
+            handleTabActivation(tabButton);
+        }
+    };
+
+    window.switchToModule = function(moduleId) {
+        const tabButton = document.querySelector(`[data-module-id="${moduleId}"]`);
+        if (tabButton && !tabButton.disabled) {
+            handleTabActivation(tabButton);
+            return true;
+        }
+        return false;
+    };
+
+    window.getActiveModule = function() {
+        const activeTab = document.querySelector('.tab-nav-item.active');
+        return activeTab ? activeTab.getAttribute('data-module-id') : null;
+    };
+
+})();
+</script>
