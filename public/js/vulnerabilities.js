@@ -1,5 +1,41 @@
+// Filter persistence and management
+function saveFiltersToStorage() {
+    const form = document.getElementById('filterForm');
+    const formData = new FormData(form);
+    const filters = {};
+
+    for (let [key, value] of formData.entries()) {
+        if (value && value.trim() !== '') {
+            filters[key] = value;
+        }
+    }
+
+    localStorage.setItem('vulnerabilityFilters', JSON.stringify(filters));
+}
+
+function loadFiltersFromStorage() {
+    try {
+        const stored = localStorage.getItem('vulnerabilityFilters');
+        if (stored) {
+            const filters = JSON.parse(stored);
+            const form = document.getElementById('filterForm');
+
+            // Apply stored filters to form fields
+            Object.keys(filters).forEach(key => {
+                const field = form.querySelector(`[name="${key}"]`);
+                if (field) {
+                    field.value = filters[key];
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading filters from storage:', error);
+    }
+}
+
 function clearFilters() {
     document.getElementById('filterForm').reset();
+    localStorage.removeItem('vulnerabilityFilters');
     window.location.href = '/vulnerabilities';
 }
 
@@ -147,3 +183,31 @@ function collapseAll() {
         card.classList.add('collapsed');
     });
 }
+
+// Initialize filter functionality when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Load saved filters from localStorage
+    loadFiltersFromStorage();
+
+    // Add event listeners for filter changes
+    const form = document.getElementById('filterForm');
+    if (form) {
+        // Save filters when any input changes
+        form.addEventListener('change', function() {
+            saveFiltersToStorage();
+        });
+
+        // Special handling for the date filter to provide immediate feedback
+        const dateFilter = document.getElementById('lastObservedAt');
+        if (dateFilter) {
+            dateFilter.addEventListener('change', function() {
+                saveFiltersToStorage();
+                // Show a brief feedback that filter was applied
+                const today = new Date().toISOString().split('T')[0];
+                if (this.value && this.value > today) {
+                    console.warn('Date filter set to future date:', this.value);
+                }
+            });
+        }
+    }
+});

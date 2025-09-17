@@ -61,7 +61,8 @@ app.get('/vulnerabilities', async (req, res) => {
             fixAvailable: req.query.fixAvailable,
             vulnerabilityId: req.query.vulnerabilityId,
             resourceId: req.query.resourceId,
-            search: req.query.search
+            search: req.query.search,
+            lastObservedAt: req.query.lastObservedAt
         };
 
         const groupByCVE = req.query.groupByCVE === 'true';
@@ -130,7 +131,8 @@ app.get('/api/vulnerabilities', async (req, res) => {
             fixAvailable: req.query.fixAvailable,
             vulnerabilityId: req.query.vulnerabilityId,
             resourceId: req.query.resourceId,
-            search: req.query.search
+            search: req.query.search,
+            lastObservedAt: req.query.lastObservedAt
         };
 
         const vulnerabilities = await db.getVulnerabilities(filters);

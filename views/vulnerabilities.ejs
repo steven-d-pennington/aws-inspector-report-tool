@@ -107,6 +107,13 @@
                     </div>
 
                     <div class="filter-group">
+                        <label for="lastObservedAt">Last Observed Date</label>
+                        <input type="date" id="lastObservedAt" name="lastObservedAt"
+                               value="<%= filters.lastObservedAt || '' %>"
+                               title="Show vulnerabilities observed on or before this date">
+                    </div>
+
+                    <div class="filter-group">
                         <label for="groupByCVE">Group by CVE</label>
                         <select id="groupByCVE" name="groupByCVE">
                             <option value="false" <%= !groupByCVE ? 'selected' : '' %>>Individual Findings</option>

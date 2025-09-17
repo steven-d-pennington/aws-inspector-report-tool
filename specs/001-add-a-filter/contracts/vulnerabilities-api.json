@@ -1,0 +1,329 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vulnerability Dashboard API - Date Filter Extension",
+    "description": "API contract for date filtering functionality on vulnerabilities endpoint",
+    "version": "1.1.0"
+  },
+  "paths": {
+    "/api/vulnerabilities": {
+      "get": {
+        "summary": "Get filtered vulnerabilities with date filtering support",
+        "description": "Retrieve vulnerabilities with optional date filtering by lastObservedAt field",
+        "parameters": [
+          {
+            "name": "severity",
+            "in": "query",
+            "description": "Filter by vulnerability severity",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by vulnerability status",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["ACTIVE", "SUPPRESSED", "CLOSED"]
+            }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "description": "Filter by AWS resource type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "description": "Filter by platform (OS/container platform)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fixAvailable",
+            "in": "query",
+            "description": "Filter by fix availability",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["YES", "NO"]
+            }
+          },
+          {
+            "name": "vulnerabilityId",
+            "in": "query",
+            "description": "Filter by vulnerability ID (CVE)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "description": "Filter by AWS resource ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Full-text search across title, description, and vulnerability ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastObservedAt",
+            "in": "query",
+            "description": "Filter vulnerabilities by last observed date - returns vulnerabilities observed on or before this date. Excludes vulnerabilities with null lastObservedAt when filter is active.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2025-09-17"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved filtered vulnerabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Vulnerability"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Vulnerability": {
+        "type": "object",
+        "required": ["id", "vulnerability_id", "title", "severity", "status"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Database primary key"
+          },
+          "report_id": {
+            "type": "integer",
+            "description": "Reference to the report that contained this vulnerability"
+          },
+          "aws_account_id": {
+            "type": "string",
+            "description": "AWS account ID where vulnerability was found"
+          },
+          "finding_arn": {
+            "type": "string",
+            "description": "AWS Inspector finding ARN"
+          },
+          "vulnerability_id": {
+            "type": "string",
+            "description": "CVE identifier or vulnerability ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Vulnerability title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed vulnerability description"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+            "description": "Vulnerability severity level"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "SUPPRESSED", "CLOSED"],
+            "description": "Current vulnerability status"
+          },
+          "fix_available": {
+            "type": "string",
+            "enum": ["YES", "NO"],
+            "description": "Whether a fix is available"
+          },
+          "inspector_score": {
+            "type": "number",
+            "description": "AWS Inspector risk score"
+          },
+          "epss_score": {
+            "type": "number",
+            "description": "EPSS (Exploit Prediction Scoring System) score"
+          },
+          "exploit_available": {
+            "type": "string",
+            "enum": ["YES", "NO"],
+            "description": "Whether exploits are known to be available"
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability was first observed",
+            "nullable": true
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability was last observed",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when vulnerability record was last updated",
+            "nullable": true
+          },
+          "resource_type": {
+            "type": "string",
+            "description": "Type of AWS resource affected"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Platform or OS where vulnerability exists"
+          },
+          "resource_id": {
+            "type": "string",
+            "description": "AWS resource identifier"
+          },
+          "details": {
+            "type": "object",
+            "description": "Parsed resource details JSON"
+          },
+          "tags": {
+            "type": "object",
+            "description": "Parsed resource tags JSON"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            },
+            "description": "Vulnerable packages associated with this vulnerability"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Reference URLs for this vulnerability"
+          }
+        }
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "vulnerability_id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "description": "Package name"
+          },
+          "version": {
+            "type": "string",
+            "description": "Current package version"
+          },
+          "fixed_version": {
+            "type": "string",
+            "description": "Version where vulnerability is fixed"
+          },
+          "package_manager": {
+            "type": "string",
+            "description": "Package manager (e.g., npm, pip, apt)"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "Path to the vulnerable package file"
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["errors"],
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field name that failed validation"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Validation error message"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Invalid value that was provided"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code"
+          }
+        }
+      }
+    }
+  }
+}
