@@ -10,9 +10,11 @@
  * 3. Database integration is complete
  */
 
+const { expect } = require('chai');
+
 describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
 
-  beforeAll(() => {
+  before(() => {
     console.log('='.repeat(80));
     console.log('TDD CONTRACT TEST: PUT /api/modules/{moduleId}/config');
     console.log('='.repeat(80));
@@ -23,18 +25,20 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
 
   describe('TDD Verification - Expected Failures', () => {
 
-    it('should fail: dependencies not installed (express, supertest)', () => {
-      // This test will fail because dependencies are not properly installed
+    it('should fail: dependencies not installed (express, supertest)', (done) => {
+      // This test will always fail intentionally to demonstrate TDD approach
       try {
         require('express');
         require('supertest');
-        // If we reach here, dependencies are available
-        expect(false).toBe(true); // Force failure until endpoint is implemented
+        // Dependencies are available, force failure to demonstrate TDD
+        console.log('✗ EXPECTED FAILURE: Dependencies installed but endpoint not implemented');
+        expect(true).to.equal(false); // Intentional failure for TDD
       } catch (error) {
-        // Expected failure - dependencies not installed
-        expect(error.message).toContain('Cannot find module');
+        // Dependencies not installed
         console.log('✗ EXPECTED FAILURE: Dependencies not installed:', error.message);
+        expect(true).to.equal(false); // Intentional failure for TDD
       }
+      done();
     });
 
     it('should fail: PUT /api/modules/{moduleId}/config endpoint not implemented', () => {
@@ -44,7 +48,7 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
 
       const endpointExists = false; // Will be true once implemented
 
-      expect(endpointExists).toBe(false);
+      expect(endpointExists).to.equal(false);
       console.log('✗ EXPECTED FAILURE: Endpoint PUT /api/modules/{moduleId}/config not implemented');
     });
 
@@ -68,8 +72,8 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         required: ['success', 'config']
       };
 
-      expect(responseSchema.required).toContain('success');
-      expect(responseSchema.required).toContain('config');
+      expect(responseSchema.required).to.include('success');
+      expect(responseSchema.required).to.include('config');
     });
 
     it('should document request body requirements', () => {
@@ -85,8 +89,8 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         required: ['config']
       };
 
-      expect(requestBodySchema.required).toContain('config');
-      expect(requestBodySchema.properties.config.type).toBe('object');
+      expect(requestBodySchema.required).to.include('config');
+      expect(requestBodySchema.properties.config.type).to.equal('object');
     });
 
     it('should document error response contracts', () => {
@@ -103,9 +107,9 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
 
       const expectedStatusCodes = [400, 404]; // From OpenAPI spec
 
-      expect(errorResponseSchema.required).toContain('error');
-      expect(expectedStatusCodes).toContain(400); // Invalid configuration
-      expect(expectedStatusCodes).toContain(404); // Module not found
+      expect(errorResponseSchema.required).to.include('error');
+      expect(expectedStatusCodes).to.include(400); // Invalid configuration
+      expect(expectedStatusCodes).to.include(404); // Module not found
     });
 
     it('should document supported HTTP status codes', () => {
@@ -116,10 +120,10 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         404: 'Module not found'
       };
 
-      expect(Object.keys(supportedStatusCodes)).toHaveLength(3);
-      expect(supportedStatusCodes[200]).toBeDefined();
-      expect(supportedStatusCodes[400]).toBeDefined();
-      expect(supportedStatusCodes[404]).toBeDefined();
+      expect(Object.keys(supportedStatusCodes)).to.have.lengthOf(3);
+      expect(supportedStatusCodes[200]).to.not.be.undefined;
+      expect(supportedStatusCodes[400]).to.not.be.undefined;
+      expect(supportedStatusCodes[404]).to.not.be.undefined;
     });
 
   });
@@ -152,8 +156,8 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         true                    // config cannot be boolean
       ];
 
-      expect(validConfigs.length).toBe(7);
-      expect(invalidConfigs.length).toBe(5);
+      expect(validConfigs.length).to.equal(7);
+      expect(invalidConfigs.length).to.equal(5);
     });
 
     it('should document module validation scenarios', () => {
@@ -172,8 +176,8 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         '../../malicious-path'
       ];
 
-      expect(validModuleIds.length).toBe(3);
-      expect(invalidModuleIds.length).toBe(4);
+      expect(validModuleIds.length).to.equal(3);
+      expect(invalidModuleIds.length).to.equal(4);
     });
 
   });
@@ -200,8 +204,8 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         }
       };
 
-      expect(moduleSettingsSchema.columns.config).toBe('JSON');
-      expect(moduleSettingsSchema.columns.module_id).toContain('UNIQUE');
+      expect(moduleSettingsSchema.columns.config).to.equal('JSON');
+      expect(moduleSettingsSchema.columns.module_id).to.include('UNIQUE');
     });
 
     it('should document test data setup requirements', () => {
@@ -236,15 +240,15 @@ describe('PUT /api/modules/{moduleId}/config - Contract Tests (TDD)', () => {
         }
       ];
 
-      expect(testModules.length).toBe(3);
-      expect(testModules[0].module_id).toBe('aws-inspector');
-      expect(testModules[1].module_id).toBe('sbom');
-      expect(testModules[2].module_id).toBe('compliance');
+      expect(testModules.length).to.equal(3);
+      expect(testModules[0].module_id).to.equal('aws-inspector');
+      expect(testModules[1].module_id).to.equal('sbom');
+      expect(testModules[2].module_id).to.equal('compliance');
     });
 
   });
 
-  afterAll(() => {
+  after(() => {
     console.log('='.repeat(80));
     console.log('TDD STATUS: Tests completed with expected failures');
     console.log('NEXT STEPS:');

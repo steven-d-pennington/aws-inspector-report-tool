@@ -19,7 +19,7 @@ describe('PUT /api/modules/{moduleId}/config - Full Contract Tests', () => {
   let server;
   let db;
 
-  beforeAll(async () => {
+  before(async () => {
     // Create Express app for testing
     app = express();
     app.use(express.json());
@@ -39,7 +39,7 @@ describe('PUT /api/modules/{moduleId}/config - Full Contract Tests', () => {
     server = app.listen(0); // Use random available port
   });
 
-  afterAll(async () => {
+  after(async () => {
     if (db && db.db) {
       await new Promise((resolve) => db.db.close(resolve));
     }

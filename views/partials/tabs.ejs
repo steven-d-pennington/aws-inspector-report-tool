@@ -33,9 +33,11 @@
  */
 
 // Process and validate modules data
-const processModules = (modules, activeModule, context) => {
+const processModules = (modules, activeModule, contextParam) => {
+    const safeContext = contextParam || {};
+
     if (!modules || !Array.isArray(modules)) {
-        return { enabledModules: [], activeModuleId: null, hasModules: false };
+        return { enabledModules: [], activeModuleId: null, hasModules: false, context: safeContext };
     }
 
     // Filter enabled modules and sort by display order
@@ -60,7 +62,7 @@ const processModules = (modules, activeModule, context) => {
         enabledModules,
         activeModuleId,
         hasModules: enabledModules.length > 0,
-        context: context || {}
+        context: safeContext
     };
 };
 
@@ -92,7 +94,8 @@ const getTabItemClass = (module, isActive) => {
 };
 
 // Process the data
-const { enabledModules, activeModuleId, hasModules, context } = processModules(modules, activeModule, context);
+const processedData = processModules(modules, activeModule, typeof context !== 'undefined' ? context : {});
+const { enabledModules, activeModuleId, hasModules, context: processedContext } = processedData;
 %>
 
 <% if (hasModules) { %>
@@ -246,7 +249,7 @@ const { enabledModules, activeModuleId, hasModules, context } = processModules(m
     <h3 class="no-modules-title">No Modules Available</h3>
     <p class="no-modules-message">
         No modules are currently enabled or available.
-        <% if (context && context.hasSettings !== false) { %>
+        <% if (processedContext && processedContext.hasSettings !== false) { %>
         Please check your <a href="/settings" class="settings-link">settings</a> to enable modules.
         <% } else { %>
         Please contact your administrator to configure modules.

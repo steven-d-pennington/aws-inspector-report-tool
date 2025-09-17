@@ -20,9 +20,9 @@
     </nav>
 
     <div class="container">
-        <!-- Include tabs navigation -->
+        <!-- Include tabs navigation with dynamic modules -->
         <%- include('partials/tabs', {
-            modules: [
+            modules: modules || [
                 {
                     id: 'aws-inspector',
                     name: 'AWS Inspector',
@@ -35,14 +35,14 @@
                 {
                     id: 'sbom',
                     name: 'SBOM Analysis',
-                    icon: '📦',
+                    icon: '📋',
                     enabled: true,
                     displayOrder: 2,
-                    route: '/sbom',
-                    status: 'coming-soon'
+                    route: '/dashboard?module=sbom',
+                    status: 'active'
                 }
             ],
-            activeModule: 'aws-inspector',
+            activeModule: currentRoute === '/dashboard' ? (typeof query !== 'undefined' && query.module ? query.module : 'aws-inspector') : 'aws-inspector',
             context: { hasSettings: true }
         }) %>
         <!-- Dashboard Content Container -->

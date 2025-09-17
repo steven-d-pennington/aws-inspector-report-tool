@@ -19,14 +19,17 @@
     "sqlite3": "^5.1.6"
   },
   "devDependencies": {
-    "chai": "^6.0.1",
+    "chai": "^4.5.0",
     "mocha": "^11.7.2",
     "nodemon": "^3.0.2",
     "supertest": "^7.1.4"
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/tests/**/*.test.js", "**/tests/**/*.spec.js"],
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/tests/**/*.spec.js"
+    ],
     "collectCoverageFrom": [
       "src/**/*.js",
       "server.js",

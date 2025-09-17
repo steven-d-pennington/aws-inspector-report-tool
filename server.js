@@ -900,6 +900,41 @@ app.get('/settings', async (req, res) => {
     }
 });
 
+// Register module routes dynamically
+async function registerModuleRoutes() {
+    try {
+        // Get enabled modules from the module service
+        const modules = await moduleService.getEnabledModules();
+
+        for (const module of modules) {
+            try {
+                // Load module definition
+                const modulePath = `./src/modules/${module.module_id}/index.js`;
+                const moduleDefinition = require(modulePath);
+
+                if (moduleDefinition.routes) {
+                    // Add database middleware for module routes
+                    const moduleRouter = moduleDefinition.routes;
+                    moduleRouter.use((req, res, next) => {
+                        req.db = db;
+                        next();
+                    });
+
+                    // Register the module routes
+                    const routePrefix = module.route || `/${module.module_id}`;
+                    app.use(routePrefix, moduleRouter);
+
+                    console.log(`Registered routes for module: ${module.module_id} at ${routePrefix}`);
+                }
+            } catch (error) {
+                console.warn(`Failed to load module ${module.module_id}:`, error.message);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to register module routes:', error);
+    }
+}
+
 // Initialize database and services, then start server
 async function initializeServices() {
     try {
@@ -916,6 +951,10 @@ async function initializeServices() {
         // Initialize module service
         await moduleService.initialize();
         console.log('Module service initialized successfully');
+
+        // Register module routes
+        await registerModuleRoutes();
+        console.log('Module routes registered successfully');
 
         app.listen(PORT, () => {
             console.log(`Vulnerability Dashboard running on http://localhost:${PORT}`);

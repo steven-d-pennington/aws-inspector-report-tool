@@ -36,7 +36,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
     });
 
     describe('TDD: Initial Failing Tests (Endpoint Not Implemented)', () => {
-        test('should fail - PUT /api/modules/reorder endpoint does not exist yet', async () => {
+        it('should fail - PUT /api/modules/reorder endpoint does not exist yet', async () => {
             // This test is designed to fail initially
             // It documents the expected API contract from settings-api.yaml
 
@@ -70,7 +70,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
     });
 
     describe('API Contract Specification from settings-api.yaml', () => {
-        test('should document successful reorder response schema', () => {
+        it('should document successful reorder response schema', () => {
             const successResponseSchema = {
                 type: 'object',
                 properties: {
@@ -105,7 +105,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
             expect(successResponseSchema.properties.modules.items.properties.display_order.type).toBe('integer');
         });
 
-        test('should document request body validation requirements', () => {
+        it('should document request body validation requirements', () => {
             const requestSchema = {
                 type: 'object',
                 properties: {
@@ -130,7 +130,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
             expect(requestSchema.properties.order.items.required).toEqual(['module_id', 'display_order']);
         });
 
-        test('should document error response schema', () => {
+        it('should document error response schema', () => {
             const errorResponseSchema = {
                 type: 'object',
                 properties: {
@@ -262,7 +262,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
         ];
 
         testScenarios.forEach(scenario => {
-            test(`should handle: ${scenario.name} (WILL FAIL - endpoint not implemented)`, () => {
+            it(`should handle: ${scenario.name} (WILL FAIL - endpoint not implemented)`, () => {
                 // Document the expected behavior
                 expect(scenario.request).toBeDefined();
                 expect(scenario.expectedStatus).toBeGreaterThanOrEqual(200);
@@ -285,7 +285,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
     });
 
     describe('Reorder Logic Validation (Future Implementation)', () => {
-        test('should document swap module orders logic', () => {
+        it('should document swap module orders logic', () => {
             const swapScenario = {
                 initial: [
                     { module_id: 'aws-inspector', display_order: 1 },
@@ -316,7 +316,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
             expect(sbomExpected.display_order).toBe(1);
         });
 
-        test('should document partial reordering logic', () => {
+        it('should document partial reordering logic', () => {
             const partialScenario = {
                 description: 'When only some modules are included in reorder request',
                 totalModules: 3,
@@ -330,7 +330,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
     });
 
     describe('Performance and Edge Cases (Future Testing)', () => {
-        test('should document large order array performance requirements', () => {
+        it('should document large order array performance requirements', () => {
             const performanceRequirements = {
                 maxModules: 100,
                 maxResponseTime: 1000, // milliseconds
@@ -341,7 +341,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
             expect(performanceRequirements.maxResponseTime).toBeLessThanOrEqual(1000);
         });
 
-        test('should document concurrent request handling', () => {
+        it('should document concurrent request handling', () => {
             const concurrencyRequirements = {
                 scenario: 'Multiple simultaneous reorder requests',
                 expectation: 'Should handle gracefully without data corruption',
@@ -354,7 +354,7 @@ describe('PUT /api/modules/reorder - Contract Tests', () => {
     });
 
     describe('Database Integration Requirements', () => {
-        test('should document persistence requirements', () => {
+        it('should document persistence requirements', () => {
             const persistenceRequirements = {
                 requirement: 'Changes must be persisted to database',
                 verification: 'Subsequent GET requests should reflect new order',
