@@ -1,0 +1,156 @@
+{
+  "endpoint": "/upload",
+  "method": "POST",
+  "description": "Upload AWS Inspector report with generation date tracking",
+  "content_type": "multipart/form-data",
+  "request": {
+    "fields": {
+      "file": {
+        "type": "file",
+        "required": true,
+        "accepted_formats": [".json", ".csv"],
+        "description": "AWS Inspector vulnerability report file"
+      },
+      "reportRunDate": {
+        "type": "string",
+        "format": "date",
+        "required": true,
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "validation": {
+          "max_date": "today",
+          "min_date": "today - 2 years",
+          "error_messages": {
+            "future_date": "Report run date cannot be in the future",
+            "too_old": "Report run date cannot be more than 2 years old",
+            "invalid_format": "Date must be in YYYY-MM-DD format",
+            "required": "Report run date is required"
+          }
+        },
+        "description": "Date when the AWS Inspector report was actually generated"
+      }
+    }
+  },
+  "responses": {
+    "200": {
+      "description": "Upload successful",
+      "content_type": "application/json",
+      "body": {
+        "success": true,
+        "message": "Report uploaded and processed successfully",
+        "reportId": "integer",
+        "filename": "string",
+        "fileFormat": "string (json|csv)",
+        "uploadDate": "string (ISO 8601 datetime)",
+        "reportRunDate": "string (ISO 8601 datetime)",
+        "vulnerabilityCount": "integer",
+        "awsAccountId": "string",
+        "processingTime": "integer (milliseconds)"
+      }
+    },
+    "400": {
+      "description": "Bad request - validation error",
+      "content_type": "application/json",
+      "body": {
+        "success": false,
+        "error": "Validation failed",
+        "details": "string (specific error message)",
+        "field": "string (reportRunDate|file)"
+      }
+    },
+    "413": {
+      "description": "File too large",
+      "content_type": "application/json",
+      "body": {
+        "success": false,
+        "error": "File size exceeds maximum limit",
+        "maxSize": "string"
+      }
+    },
+    "415": {
+      "description": "Unsupported file type",
+      "content_type": "application/json",
+      "body": {
+        "success": false,
+        "error": "Unsupported file format",
+        "supportedFormats": ["json", "csv"]
+      }
+    },
+    "500": {
+      "description": "Internal server error",
+      "content_type": "application/json",
+      "body": {
+        "success": false,
+        "error": "Internal server error",
+        "message": "string"
+      }
+    }
+  },
+  "examples": {
+    "valid_request": {
+      "description": "Successful upload with historical date",
+      "request": {
+        "file": "inspector-report-2025-09-15.json",
+        "reportRunDate": "2025-09-15"
+      },
+      "response": {
+        "success": true,
+        "message": "Report uploaded and processed successfully",
+        "reportId": 123,
+        "filename": "inspector-report-2025-09-15.json",
+        "fileFormat": "json",
+        "uploadDate": "2025-09-18T10:30:00.000Z",
+        "reportRunDate": "2025-09-15T00:00:00.000Z",
+        "vulnerabilityCount": 42,
+        "awsAccountId": "123456789012",
+        "processingTime": 1500
+      }
+    },
+    "future_date_error": {
+      "description": "Error when report run date is in the future",
+      "request": {
+        "file": "inspector-report.json",
+        "reportRunDate": "2025-12-01"
+      },
+      "response": {
+        "success": false,
+        "error": "Validation failed",
+        "details": "Report run date cannot be in the future",
+        "field": "reportRunDate"
+      }
+    },
+    "missing_date_error": {
+      "description": "Error when report run date is missing",
+      "request": {
+        "file": "inspector-report.json"
+      },
+      "response": {
+        "success": false,
+        "error": "Validation failed",
+        "details": "Report run date is required",
+        "field": "reportRunDate"
+      }
+    }
+  },
+  "validation_rules": [
+    "reportRunDate must be present",
+    "reportRunDate must be valid ISO date format (YYYY-MM-DD)",
+    "reportRunDate must not be in the future",
+    "reportRunDate must not be more than 2 years old",
+    "file must be present and non-empty",
+    "file must have .json or .csv extension",
+    "file must be valid AWS Inspector report format"
+  ],
+  "testing_scenarios": [
+    "Upload with today's date as report run date",
+    "Upload with historical date (1 week ago) as report run date",
+    "Upload with historical date (1 year ago) as report run date",
+    "Attempt upload with future date (should fail)",
+    "Attempt upload with date more than 2 years old (should fail)",
+    "Attempt upload without report run date (should fail)",
+    "Attempt upload with invalid date format (should fail)",
+    "Upload CSV file with valid historical date",
+    "Upload JSON file with valid historical date",
+    "Verify both upload_date and report_run_date are stored correctly",
+    "Verify report_run_date is preserved during vulnerability archiving"
+  ]
+}

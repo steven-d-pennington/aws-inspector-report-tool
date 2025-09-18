@@ -1,0 +1,177 @@
+{
+  "component": "DatePickerSection",
+  "description": "Date picker UI component for report generation date selection",
+  "location": "views/index.ejs",
+  "visibility": {
+    "initial": "hidden",
+    "trigger": "file_selected",
+    "condition": "file input has valid file selected"
+  },
+  "html_structure": {
+    "container": {
+      "id": "datePickerSection",
+      "class": "date-picker-section",
+      "style": "display: none"
+    },
+    "elements": [
+      {
+        "tag": "label",
+        "for": "reportRunDate",
+        "text": "When was this Inspector report generated?",
+        "class": "date-picker-label"
+      },
+      {
+        "tag": "input",
+        "type": "date",
+        "id": "reportRunDate",
+        "name": "reportRunDate",
+        "required": true,
+        "attributes": {
+          "max": "today",
+          "min": "today - 2 years"
+        },
+        "class": "date-picker-input"
+      },
+      {
+        "tag": "p",
+        "class": "date-helper-text",
+        "text": "This helps maintain accurate historical tracking when uploading past reports"
+      }
+    ]
+  },
+  "javascript_behavior": {
+    "initialization": {
+      "function": "initializeDatePicker",
+      "actions": [
+        "Set max date to today",
+        "Set default value to today",
+        "Set min date to 2 years ago",
+        "Hide section initially"
+      ]
+    },
+    "show_trigger": {
+      "event": "file_selected",
+      "actions": [
+        "Show date picker section",
+        "Focus date input",
+        "Reset date to today"
+      ]
+    },
+    "validation": {
+      "events": ["change", "blur"],
+      "rules": [
+        "Must not be empty",
+        "Must not be future date",
+        "Must not be more than 2 years old",
+        "Must be valid date format"
+      ],
+      "error_display": {
+        "method": "inline_message",
+        "class": "date-error",
+        "position": "below_input"
+      }
+    },
+    "form_integration": {
+      "submit_prevention": "if invalid date selected",
+      "data_submission": "include in form data as reportRunDate"
+    }
+  },
+  "css_styling": {
+    "container": {
+      ".date-picker-section": {
+        "margin": "20px 0",
+        "padding": "15px",
+        "border": "1px solid #ddd",
+        "border-radius": "5px",
+        "background": "#f9f9f9"
+      }
+    },
+    "label": {
+      ".date-picker-label": {
+        "display": "block",
+        "font-weight": "bold",
+        "margin-bottom": "8px",
+        "color": "#333"
+      }
+    },
+    "input": {
+      ".date-picker-input": {
+        "width": "200px",
+        "padding": "8px",
+        "border": "1px solid #ccc",
+        "border-radius": "3px",
+        "font-size": "14px"
+      },
+      ".date-picker-input:focus": {
+        "border-color": "#007bff",
+        "outline": "none",
+        "box-shadow": "0 0 0 2px rgba(0,123,255,.25)"
+      }
+    },
+    "helper_text": {
+      ".date-helper-text": {
+        "font-size": "12px",
+        "color": "#666",
+        "margin-top": "5px",
+        "font-style": "italic"
+      }
+    },
+    "error": {
+      ".date-error": {
+        "color": "#dc3545",
+        "font-size": "12px",
+        "margin-top": "3px"
+      }
+    },
+    "animations": {
+      ".date-picker-section": {
+        "transition": "opacity 0.3s ease-in-out"
+      }
+    }
+  },
+  "accessibility": {
+    "label_association": "for/id attributes linked",
+    "required_indicator": "aria-required=\"true\"",
+    "error_announcement": "aria-describedby for error messages",
+    "keyboard_navigation": "full keyboard accessibility",
+    "screen_reader": "descriptive labels and help text"
+  },
+  "integration_points": {
+    "file_upload": {
+      "trigger_event": "file input change",
+      "callback": "showDatePicker()"
+    },
+    "form_submission": {
+      "validation": "validateDatePicker()",
+      "data_collection": "getReportRunDate()"
+    },
+    "upload_handler": {
+      "server_endpoint": "/upload",
+      "form_field": "reportRunDate"
+    }
+  },
+  "testing_scenarios": [
+    "Date picker is hidden initially",
+    "Date picker appears when file is selected",
+    "Date picker disappears when file is cleared",
+    "Default date is set to today",
+    "Max date is set to today (prevents future dates)",
+    "Min date is set to 2 years ago",
+    "Selecting future date shows error message",
+    "Selecting date more than 2 years old shows error",
+    "Valid date selection enables form submission",
+    "Form cannot be submitted without date selection",
+    "Date value is included in form submission",
+    "Date picker is keyboard accessible",
+    "Screen reader announces date picker properly",
+    "Date picker styling matches application theme",
+    "Date picker works in all supported browsers"
+  ],
+  "browser_compatibility": {
+    "chrome": "Full support",
+    "firefox": "Full support",
+    "safari": "Full support",
+    "edge": "Full support",
+    "ie11": "Fallback to text input with pattern validation"
+  }
+}

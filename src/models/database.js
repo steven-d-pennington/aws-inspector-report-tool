@@ -102,12 +102,12 @@ class Database {
         });
     }
 
-    async insertReport(filename, vulnerabilityCount, awsAccountId) {
+    async insertReport(filename, vulnerabilityCount, awsAccountId, reportRunDate = null) {
         return new Promise((resolve, reject) => {
             this.db.run(
-                `INSERT INTO reports (filename, vulnerability_count, aws_account_id)
-                 VALUES (?, ?, ?)`,
-                [filename, vulnerabilityCount, awsAccountId],
+                `INSERT INTO reports (filename, vulnerability_count, aws_account_id, report_run_date)
+                 VALUES (?, ?, ?, ?)`,
+                [filename, vulnerabilityCount, awsAccountId, reportRunDate],
                 function(err) {
                     if (err) reject(err);
                     else resolve(this.lastID);
@@ -726,12 +726,13 @@ class Database {
                     INSERT INTO vulnerability_history
                     (finding_arn, vulnerability_id, title, severity, status, fix_available,
                      inspector_score, first_observed_at, last_observed_at, archived_at,
-                     original_report_id, archived_from_report_id)
+                     report_run_date, original_report_id, archived_from_report_id)
                     SELECT
-                        finding_arn, vulnerability_id, title, severity, status, fix_available,
-                        inspector_score, first_observed_at, last_observed_at, CURRENT_TIMESTAMP,
-                        report_id, ?
-                    FROM vulnerabilities
+                        v.finding_arn, v.vulnerability_id, v.title, v.severity, v.status, v.fix_available,
+                        v.inspector_score, v.first_observed_at, v.last_observed_at, CURRENT_TIMESTAMP,
+                        r.report_run_date, v.report_id, ?
+                    FROM vulnerabilities v
+                    LEFT JOIN reports r ON r.id = v.report_id
                 `, [reportId], (err) => {
                     if (err) return reject(err);
 
@@ -773,6 +774,7 @@ class Database {
                     h.first_observed_at,
                     h.last_observed_at,
                     h.archived_at as fixed_date,
+                    h.report_run_date,
                     CASE
                         WHEN h.first_observed_at IS NOT NULL
                         THEN ROUND((julianday(h.archived_at) - julianday(h.first_observed_at)))

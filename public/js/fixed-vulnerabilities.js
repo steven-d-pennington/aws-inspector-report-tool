@@ -243,7 +243,12 @@ class FixedVulnerabilitiesManager {
                     </span>
                 </td>
                 <td>
-                    <span class="date-text">
+                    <span class="date-text" title="AWS Inspector report generation date">
+                        ${vuln.report_run_date ? this.formatDate(vuln.report_run_date) : 'Not available'}
+                    </span>
+                </td>
+                <td>
+                    <span class="date-text" title="Date when vulnerability was detected as fixed">
                         ${this.formatDate(vuln.fixed_date)}
                     </span>
                 </td>
@@ -397,7 +402,7 @@ class FixedVulnerabilitiesManager {
     downloadCSV(vulnerabilities) {
         const headers = [
             'Vulnerability ID', 'Title', 'Severity', 'Affected Resources',
-            'Resource Types', 'First Observed', 'Fixed Date', 'Days Active', 'Fix Available'
+            'Resource Types', 'First Observed', 'Report Generated', 'Fixed Date', 'Days Active', 'Fix Available'
         ];
 
         const rows = vulnerabilities.map(vuln => [
@@ -407,6 +412,7 @@ class FixedVulnerabilitiesManager {
             vuln.affected_resources.join('; '),
             vuln.resource_types.join('; '),
             vuln.first_observed_at || '',
+            vuln.report_run_date || '',
             vuln.fixed_date || '',
             vuln.days_active || '',
             vuln.fix_was_available ? 'Yes' : 'No'

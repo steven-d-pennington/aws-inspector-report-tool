@@ -1,0 +1,105 @@
+{
+  "findings": [
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/test1",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Test vulnerability for date picker validation",
+      "title": "CVE-2024-TEST1 - Test Package Vulnerability",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-09-01T08:00:00Z",
+      "lastObservedAt": "2024-09-15T10:30:00Z",
+      "updatedAt": "2024-09-15T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-TEST1",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-TEST1",
+        "vulnerablePackages": [
+          {
+            "name": "test-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1.el8",
+            "architecture": "x86_64",
+            "packageManager": "YUM",
+            "fixedInVersion": "1.1.0"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-1234567890abcdef0",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "test-instance-1"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update test-package to version 1.1.0 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 7.5,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.5,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/test2",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Another test vulnerability for validation purposes",
+      "title": "CVE-2024-TEST2 - Another Test Vulnerability",
+      "severity": "MEDIUM",
+      "firstObservedAt": "2024-08-15T12:00:00Z",
+      "lastObservedAt": "2024-09-15T10:30:00Z",
+      "updatedAt": "2024-09-15T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "NO",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-TEST2",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-TEST2",
+        "vulnerablePackages": [
+          {
+            "name": "another-package",
+            "version": "2.0.0",
+            "epoch": 0,
+            "release": "1.el8",
+            "architecture": "x86_64",
+            "packageManager": "YUM"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-0987654321fedcba0",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "test-instance-2"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "No fix is currently available for this vulnerability. Monitor vendor advisories."
+        }
+      },
+      "inspectorScore": 5.3,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 5.3,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    }
+  ]
+}

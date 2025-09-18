@@ -127,7 +127,8 @@
                 <thead>
                     <tr>
                         <th>Filename</th>
-                        <th>Upload Date</th>
+                        <th>Generated</th>
+                        <th>Uploaded</th>
                         <th>Account ID</th>
                         <th>Vulnerabilities</th>
                         <th>Actions</th>
@@ -138,7 +139,22 @@
                         <% recentReports.forEach(report => { %>
                             <tr>
                                 <td><%= report.filename %></td>
-                                <td><%= new Date(report.upload_date).toLocaleString() %></td>
+                                <td>
+                                    <% if (report.report_run_date) { %>
+                                        <span title="Report generation date from AWS Inspector">
+                                            <%= new Date(report.report_run_date).toLocaleString() %>
+                                        </span>
+                                    <% } else { %>
+                                        <span class="text-muted" title="Legacy report - generation date not available">
+                                            Not available
+                                        </span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span title="Date when report was uploaded to dashboard">
+                                        <%= new Date(report.upload_date).toLocaleString() %>
+                                    </span>
+                                </td>
                                 <td><%= report.aws_account_id || 'N/A' %></td>
                                 <td><%= report.vulnerability_count %></td>
                                 <td>
@@ -150,7 +166,7 @@
                         <% }) %>
                     <% } else { %>
                         <tr>
-                            <td colspan="5" class="text-center">No reports uploaded yet</td>
+                            <td colspan="6" class="text-center">No reports uploaded yet</td>
                         </tr>
                     <% } %>
                 </tbody>

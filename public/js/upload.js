@@ -66,6 +66,9 @@ function handleFileSelect(file) {
 
     document.getElementById('fileInfo').style.display = 'block';
     document.getElementById('uploadArea').style.display = 'none';
+
+    // Show date picker section after file selection
+    showDatePicker();
 }
 
 function clearFile() {
@@ -73,6 +76,9 @@ function clearFile() {
     document.getElementById('fileInput').value = '';
     document.getElementById('fileInfo').style.display = 'none';
     document.getElementById('uploadArea').style.display = 'block';
+
+    // Hide date picker and reset form
+    hideDatePicker();
 }
 
 function formatFileSize(bytes) {
@@ -85,14 +91,125 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// Date picker management functions
+function showDatePicker() {
+    const datePicker = document.getElementById('datePicker');
+    const dateInput = document.getElementById('reportDate');
+
+    // Set up date constraints
+    setupDateConstraints();
+
+    // Show the date picker section with smooth transition
+    datePicker.style.display = 'block';
+    datePicker.setAttribute('aria-hidden', 'false');
+
+    // Set default date to today
+    if (!dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Add event listener for date validation
+    dateInput.addEventListener('change', validateDate);
+    dateInput.addEventListener('blur', validateDate);
+}
+
+function hideDatePicker() {
+    const datePicker = document.getElementById('datePicker');
+    const dateInput = document.getElementById('reportDate');
+
+    // Hide the date picker section
+    datePicker.style.display = 'none';
+    datePicker.setAttribute('aria-hidden', 'true');
+
+    // Reset the date input
+    dateInput.value = '';
+    clearDateError();
+
+    // Remove event listeners
+    dateInput.removeEventListener('change', validateDate);
+    dateInput.removeEventListener('blur', validateDate);
+}
+
+function setupDateConstraints() {
+    const dateInput = document.getElementById('reportDate');
+    const today = new Date();
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(today.getFullYear() - 2);
+
+    // Set max to today (prevent future dates)
+    dateInput.max = today.toISOString().split('T')[0];
+
+    // Set min to 2 years ago
+    dateInput.min = twoYearsAgo.toISOString().split('T')[0];
+}
+
+function validateDate() {
+    const dateInput = document.getElementById('reportDate');
+    const selectedDate = new Date(dateInput.value);
+    const today = new Date();
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(today.getFullYear() - 2);
+
+    // Clear previous errors
+    clearDateError();
+
+    if (!dateInput.value) {
+        showDateError('Please select a report generation date.');
+        return false;
+    }
+
+    if (selectedDate > today) {
+        showDateError('Report generation date cannot be in the future.');
+        return false;
+    }
+
+    if (selectedDate < twoYearsAgo) {
+        showDateError('Report generation date cannot be more than 2 years old.');
+        return false;
+    }
+
+    return true;
+}
+
+function showDateError(message) {
+    const dateError = document.getElementById('dateError');
+    const dateInput = document.getElementById('reportDate');
+
+    dateError.textContent = message;
+    dateError.style.display = 'block';
+    dateInput.setAttribute('aria-invalid', 'true');
+    dateInput.classList.add('date-input-error');
+}
+
+function clearDateError() {
+    const dateError = document.getElementById('dateError');
+    const dateInput = document.getElementById('reportDate');
+
+    dateError.textContent = '';
+    dateError.style.display = 'none';
+    dateInput.setAttribute('aria-invalid', 'false');
+    dateInput.classList.remove('date-input-error');
+}
+
 async function uploadFile() {
     if (!selectedFile) {
         alert('Please select a file');
         return;
     }
 
+    // Validate the selected date before upload
+    if (!validateDate()) {
+        return;
+    }
+
     const formData = new FormData();
     formData.append('reportFile', selectedFile);
+
+    // Add the report generation date to the form data
+    const reportDate = document.getElementById('reportDate').value;
+    if (reportDate) {
+        formData.append('reportDate', reportDate);
+    }
 
     // Show progress
     document.getElementById('fileInfo').style.display = 'none';
@@ -150,6 +267,7 @@ async function uploadFile() {
 function resetUpload() {
     clearFile();
     document.getElementById('uploadResult').style.display = 'none';
+    hideDatePicker();
 }
 
 async function loadRecentReports() {
