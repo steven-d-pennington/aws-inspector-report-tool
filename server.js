@@ -130,6 +130,25 @@ app.post('/upload', upload.single('reportFile'), async (req, res) => {
         // Import required services
         const fileTypeDetector = require('./src/utils/fileTypeDetector');
         const csvParserService = require('./src/services/csvParserService');
+        const dateValidator = require('./src/utils/dateValidator');
+
+        // Validate report run date from form data
+        const reportRunDate = req.body.reportDate || req.body.reportRunDate;
+        const dateValidation = dateValidator.validateReportRunDate(reportRunDate);
+
+        if (!dateValidation.isValid) {
+            // Clean up uploaded file
+            await fs.unlink(filePath);
+
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: dateValidation.error,
+                field: dateValidation.field
+            });
+        }
+
+        const normalizedReportRunDate = dateValidation.date;
 
         // Detect file format
         const fileTypeInfo = fileTypeDetector.getFileTypeInfo(fileName, filePath);
@@ -189,7 +208,7 @@ app.post('/upload', upload.single('reportFile'), async (req, res) => {
         }
 
         // Process and store the report (same logic for both formats)
-        const reportId = await reportService.processReport(reportData, db, fileName);
+        const reportId = await reportService.processReport(reportData, db, fileName, normalizedReportRunDate);
 
         // Clean up uploaded file
         await fs.unlink(filePath);
@@ -202,7 +221,9 @@ app.post('/upload', upload.single('reportFile'), async (req, res) => {
             reportId: reportId,
             vulnerabilityCount: reportData.findings ? reportData.findings.length : 0,
             fileFormat: fileFormat,
-            processingTime: processingTime
+            processingTime: processingTime,
+            uploadDate: new Date().toISOString(),
+            reportRunDate: normalizedReportRunDate
         });
 
     } catch (error) {

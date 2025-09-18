@@ -23,9 +23,10 @@ class ReportService {
      * @param {object} reportData - Parsed report data
      * @param {Database} db - Database instance
      * @param {string} filename - Original filename
+     * @param {string} reportRunDate - Optional report run date (ISO string)
      * @returns {Promise<number>} Report ID
      */
-    async processReportWithHistory(reportData, db, filename) {
+    async processReportWithHistory(reportData, db, filename, reportRunDate = null) {
         // Initialize services if not already done
         if (!this.historyService) {
             this.initialize(db);
@@ -53,7 +54,7 @@ class ReportService {
 
             // Step 5: Import new data
             await uploadEvent.startImporting();
-            reportId = await this._processReportData(reportData, db, filename);
+            reportId = await this._processReportData(reportData, db, filename, reportRunDate);
             await uploadEvent.completeImporting(reportData.findings?.length || 0);
 
             // Step 6: Commit transaction
@@ -90,9 +91,15 @@ class ReportService {
     /**
      * Legacy method for backward compatibility
      * Routes to the new history-aware method
+     *
+     * @param {object} reportData - Parsed report data
+     * @param {Database} db - Database instance
+     * @param {string} filename - Original filename
+     * @param {string} reportRunDate - Optional report run date (ISO string)
+     * @returns {Promise<number>} Report ID
      */
-    async processReport(reportData, db, filename) {
-        return await this.processReportWithHistory(reportData, db, filename);
+    async processReport(reportData, db, filename, reportRunDate = null) {
+        return await this.processReportWithHistory(reportData, db, filename, reportRunDate);
     }
 
     /**
@@ -102,15 +109,16 @@ class ReportService {
      * @param {object} reportData - Parsed report data
      * @param {Database} db - Database instance
      * @param {string} filename - Original filename
+     * @param {string} reportRunDate - Optional report run date (ISO string)
      * @returns {Promise<number>} Report ID
      */
-    async _processReportData(reportData, db, filename) {
+    async _processReportData(reportData, db, filename, reportRunDate = null) {
         try {
             const findings = reportData.findings || [];
             const awsAccountId = findings.length > 0 ? findings[0].awsAccountId : 'unknown';
 
             // Insert main report record
-            const reportId = await db.insertReport(filename, findings.length, awsAccountId);
+            const reportId = await db.insertReport(filename, findings.length, awsAccountId, reportRunDate);
 
             // Process each finding
             for (const finding of findings) {
@@ -216,11 +224,12 @@ class ReportService {
      * @param {object} reportData - Parsed report data
      * @param {Database} db - Database instance
      * @param {string} filename - Original filename
+     * @param {string} reportRunDate - Optional report run date (ISO string)
      * @returns {Promise<number>} Report ID
      */
-    async processReportDirectly(reportData, db, filename) {
+    async processReportDirectly(reportData, db, filename, reportRunDate = null) {
         console.log('⚠️ Processing report without history workflow');
-        return await this._processReportData(reportData, db, filename);
+        return await this._processReportData(reportData, db, filename, reportRunDate);
     }
 }
 
