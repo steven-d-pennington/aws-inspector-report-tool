@@ -16,7 +16,8 @@
       "Bash(.specify/scripts/powershell/create-new-feature.ps1 -Json \"Add support for CSV format AWS Inspector reports in addition to the existing JSON format. The application should automatically detect file type (.json vs .csv) during upload and parse CSV files into the same internal data structure, requiring a CSV parser service and minor upload handler modifications.\")",
       "Bash(.specify/scripts/powershell/update-agent-context.ps1 -AgentType claude)",
       "Bash(dir:*)",
-      "Bash(.specify/scripts/powershell/check-task-prerequisites.ps1 -Json)"
+      "Bash(.specify/scripts/powershell/check-task-prerequisites.ps1 -Json)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
