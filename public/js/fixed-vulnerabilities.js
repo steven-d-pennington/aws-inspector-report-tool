@@ -233,8 +233,8 @@ class FixedVulnerabilitiesManager {
                 </td>
                 <td>
                     <div class="resource-info">
-                        <span class="resource-count">${vuln.affected_resources.length} resource(s)</span>
-                        ${this.formatResourceTypes(vuln.resource_types)}
+                        <span class="resource-count">${(vuln.affected_resources || []).length} resource(s)</span>
+                        ${this.formatResourceTypes(vuln.resource_types || [])}
                     </div>
                 </td>
                 <td>
@@ -409,8 +409,8 @@ class FixedVulnerabilitiesManager {
             vuln.vulnerability_id || '',
             (vuln.title || '').replace(/"/g, '""'),
             vuln.severity || '',
-            vuln.affected_resources.join('; '),
-            vuln.resource_types.join('; '),
+            (vuln.affected_resources || []).join('; '),
+            (vuln.resource_types || []).join('; '),
             vuln.first_observed_at || '',
             vuln.report_run_date || '',
             vuln.fixed_date || '',
