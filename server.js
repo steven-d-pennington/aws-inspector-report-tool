@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -92,16 +94,40 @@ app.get('/vulnerabilities', async (req, res) => {
         // Check if any filters are applied
         const hasFilters = Object.values(filters).some(value => value && value.trim() !== '') || groupByCVE;
 
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const pagination = { page, limit };
+
         let vulnerabilities = [];
+        let totalCount = 0;
+        let totalPages = 0;
+
         if (hasFilters) {
             if (groupByCVE) {
                 vulnerabilities = await db.getVulnerabilitiesGroupedByCVE(filters);
+                totalCount = vulnerabilities.length; // For grouped results, count is the array length
+                totalPages = 1; // Grouped results are not paginated
             } else {
-                vulnerabilities = await db.getVulnerabilities(filters);
+                // Get accurate total count first
+                totalCount = await db.getVulnerabilitiesCount(filters);
+                totalPages = Math.ceil(totalCount / limit);
+
+                // Skip expensive packages/references queries for list view performance
+                vulnerabilities = await db.getVulnerabilities(filters, false, pagination);
             }
         }
 
         const filterOptions = await db.getFilterOptions();
+
+        // Build query string for pagination links
+        const queryParams = [];
+        Object.keys(filters).forEach(key => {
+            if (filters[key] && filters[key].trim() !== '') {
+                queryParams.push(`${key}=${encodeURIComponent(filters[key])}`);
+            }
+        });
+        const baseQuery = queryParams.length > 0 ? queryParams.join('&') + '&' : '';
 
         res.render('vulnerabilities', {
             vulnerabilities,
@@ -109,7 +135,16 @@ app.get('/vulnerabilities', async (req, res) => {
             filterOptions,
             groupByCVE: groupByCVE || false,
             hasFilters,
-            selectedAccountId: req.query.awsAccountId || ''
+            selectedAccountId: req.query.awsAccountId || '',
+            pagination: {
+                currentPage: page,
+                totalPages,
+                totalCount,
+                limit,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1,
+                baseQuery
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -171,15 +171,40 @@
                 </div>
             </div>
 
+            <!-- Pagination Info and Controls -->
+            <% if (hasFilters && pagination && pagination.totalCount > 0) { %>
+                <div class="pagination-info">
+                    <p>Showing <strong><%= (pagination.currentPage - 1) * pagination.limit + 1 %></strong>
+                       to <strong><%= Math.min(pagination.currentPage * pagination.limit, pagination.totalCount) %></strong>
+                       of <strong><%= pagination.totalCount %></strong> vulnerabilities</p>
+                </div>
+
+                <% if (pagination.totalPages > 1) { %>
+                    <div class="pagination-controls">
+                        <% if (pagination.hasPrevPage) { %>
+                            <a href="?<%= pagination.baseQuery %>page=1" class="btn btn-secondary">First</a>
+                            <a href="?<%= pagination.baseQuery %>page=<%= pagination.currentPage - 1 %>" class="btn btn-secondary">Previous</a>
+                        <% } %>
+
+                        <span class="pagination-info">Page <%= pagination.currentPage %> of <%= pagination.totalPages %></span>
+
+                        <% if (pagination.hasNextPage) { %>
+                            <a href="?<%= pagination.baseQuery %>page=<%= pagination.currentPage + 1 %>" class="btn btn-secondary">Next</a>
+                            <a href="?<%= pagination.baseQuery %>page=<%= pagination.totalPages %>" class="btn btn-secondary">Last</a>
+                        <% } %>
+                    </div>
+                <% } %>
+            <% } %>
+
             <div class="vulnerabilities-list">
                 <% if (vulnerabilities && vulnerabilities.length > 0) { %>
                     <% vulnerabilities.forEach((vuln, index) => { %>
-                        <div class="vulnerability-card <%= vuln.severity.toLowerCase() %> collapsed" data-card-id="<%= index %>">
+                        <div class="vulnerability-card <%= (vuln.severity || 'unknown').toLowerCase() %> collapsed" data-card-id="<%= index %>">
                             <div class="vuln-header" onclick="toggleCard(<%= index %>)">
                                 <input type="checkbox" class="vuln-checkbox" value="<%= vuln.id %>" onchange="updateSelection()" onclick="event.stopPropagation()">
                                 <div class="vuln-title">
                                     <h3><%= vuln.vulnerability_id || vuln.title %></h3>
-                                    <span class="severity-badge <%= vuln.severity.toLowerCase() %>"><%= vuln.severity %></span>
+                                    <span class="severity-badge <%= (vuln.severity || 'unknown').toLowerCase() %>"><%= vuln.severity || 'Unknown' %></span>
                                     <% if (vuln.fix_available === 'YES') { %>
                                         <span class="fix-badge">Fix Available</span>
                                     <% } %>
@@ -336,7 +361,11 @@
                                         <h4>References:</h4>
                                         <ul class="reference-list">
                                             <% vuln.references.forEach(ref => { %>
-                                                <li><a href="<%= ref %>" target="_blank"><%= ref %></a></li>
+                                                <% if (typeof ref === 'string') { %>
+                                                    <li><a href="<%= ref %>" target="_blank"><%= ref %></a></li>
+                                                <% } else if (ref && ref.url) { %>
+                                                    <li><a href="<%= ref.url %>" target="_blank"><%= ref.title || ref.url %></a></li>
+                                                <% } %>
                                             <% }) %>
                                         </ul>
                                     </div>
@@ -362,6 +391,23 @@
                     </div>
                 <% } %>
             </div>
+
+            <!-- Bottom Pagination Controls -->
+            <% if (hasFilters && pagination && pagination.totalCount > 0 && pagination.totalPages > 1) { %>
+                <div class="pagination-controls bottom-pagination">
+                    <% if (pagination.hasPrevPage) { %>
+                        <a href="?<%= pagination.baseQuery %>page=1" class="btn btn-secondary">First</a>
+                        <a href="?<%= pagination.baseQuery %>page=<%= pagination.currentPage - 1 %>" class="btn btn-secondary">Previous</a>
+                    <% } %>
+
+                    <span class="pagination-info">Page <%= pagination.currentPage %> of <%= pagination.totalPages %></span>
+
+                    <% if (pagination.hasNextPage) { %>
+                        <a href="?<%= pagination.baseQuery %>page=<%= pagination.currentPage + 1 %>" class="btn btn-secondary">Next</a>
+                        <a href="?<%= pagination.baseQuery %>page=<%= pagination.totalPages %>" class="btn btn-secondary">Last</a>
+                    <% } %>
+                </div>
+            <% } %>
         </div>
     </div>
 

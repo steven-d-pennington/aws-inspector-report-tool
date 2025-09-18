@@ -1,1064 +1,549 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+/**
+ * Database Service Factory
+ * Switches between SQLite and PostgreSQL based on environment configuration
+ * Maintains backward compatibility with existing interface
+ */
+
+const { PostgreSQLDatabaseService } = require('./postgresql-database');
 
 class Database {
     constructor() {
-        this.dbPath = path.join(__dirname, '../../db/vulnerabilities.db');
-        this.db = null;
+        this.service = null;
+        this.initialized = false;
     }
 
     async initialize() {
-        return new Promise((resolve, reject) => {
-            this.db = new sqlite3.Database(this.dbPath, (err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    this.createTables().then(resolve).catch(reject);
-                }
-            });
-        });
+        console.log('🔄 Initializing database service...');
+
+        // Check database type from environment
+        const dbType = process.env.DATABASE_TYPE || 'sqlite';
+
+        if (dbType === 'postgresql') {
+            console.log('📊 Using PostgreSQL database service');
+            this.service = new PostgreSQLDatabaseService();
+        } else {
+            // Fallback to SQLite (original implementation)
+            console.log('📊 Using SQLite database service (fallback)');
+            const SQLiteService = require('./database-sqlite-backup');
+            this.service = new SQLiteService();
+        }
+
+        await this.service.initialize();
+        this.initialized = true;
+        console.log('✅ Database service initialized successfully');
     }
 
-    async createTables() {
-        return new Promise((resolve, reject) => {
-            this.db.serialize(() => {
-                // Reports table
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS reports (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        filename TEXT,
-                        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        vulnerability_count INTEGER,
-                        aws_account_id TEXT
-                    )
-                `);
+    // Proxy all methods to the underlying service
+    // This maintains exact interface compatibility
 
-                // Vulnerabilities table
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS vulnerabilities (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        report_id INTEGER,
-                        aws_account_id TEXT,
-                        finding_arn TEXT UNIQUE,
-                        vulnerability_id TEXT,
-                        title TEXT,
-                        description TEXT,
-                        severity TEXT,
-                        status TEXT,
-                        fix_available TEXT,
-                        inspector_score REAL,
-                        epss_score REAL,
-                        exploit_available TEXT,
-                        first_observed_at DATETIME,
-                        last_observed_at DATETIME,
-                        updated_at DATETIME,
-                        FOREIGN KEY (report_id) REFERENCES reports(id)
-                    )
-                `);
-
-                // Resources table
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS resources (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        vulnerability_id INTEGER,
-                        resource_id TEXT,
-                        resource_type TEXT,
-                        resource_arn TEXT,
-                        platform TEXT,
-                        region TEXT,
-                        details TEXT,
-                        tags TEXT,
-                        FOREIGN KEY (vulnerability_id) REFERENCES vulnerabilities(id)
-                    )
-                `);
-
-                // Packages table
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS packages (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        vulnerability_id INTEGER,
-                        name TEXT,
-                        version TEXT,
-                        fixed_version TEXT,
-                        package_manager TEXT,
-                        file_path TEXT,
-                        FOREIGN KEY (vulnerability_id) REFERENCES vulnerabilities(id)
-                    )
-                `);
-
-                // References table (using quotes to avoid SQL keyword conflict)
-                this.db.run(`
-                    CREATE TABLE IF NOT EXISTS "references" (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        vulnerability_id INTEGER,
-                        url TEXT,
-                        FOREIGN KEY (vulnerability_id) REFERENCES vulnerabilities(id)
-                    )
-                `, (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            });
-        });
-    }
-
-    async insertReport(filename, vulnerabilityCount, awsAccountId, reportRunDate = null) {
-        return new Promise((resolve, reject) => {
-            this.db.run(
-                `INSERT INTO reports (filename, vulnerability_count, aws_account_id, report_run_date)
-                 VALUES (?, ?, ?, ?)`,
-                [filename, vulnerabilityCount, awsAccountId, reportRunDate],
-                function(err) {
-                    if (err) reject(err);
-                    else resolve(this.lastID);
-                }
-            );
-        });
-    }
-
-    async insertVulnerability(reportId, vuln) {
-        return new Promise((resolve, reject) => {
-            const epssScore = vuln.epss ? vuln.epss.score : null;
-
-            this.db.run(
-                `INSERT OR REPLACE INTO vulnerabilities
-                 (report_id, aws_account_id, finding_arn, vulnerability_id, title,
-                  description, severity, status, fix_available, inspector_score,
-                  epss_score, exploit_available, first_observed_at, last_observed_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    reportId,
-                    vuln.awsAccountId,
-                    vuln.findingArn,
-                    vuln.packageVulnerabilityDetails?.vulnerabilityId || vuln.title,
-                    vuln.title,
-                    vuln.description,
-                    vuln.severity,
-                    vuln.status,
-                    vuln.fixAvailable,
-                    vuln.inspectorScore,
-                    epssScore,
-                    vuln.exploitAvailable,
-                    vuln.firstObservedAt,
-                    vuln.lastObservedAt,
-                    vuln.updatedAt
-                ],
-                function(err) {
-                    if (err) reject(err);
-                    else resolve(this.lastID);
-                }
-            );
-        });
-    }
-
-    async insertResource(vulnerabilityId, resource) {
-        return new Promise((resolve, reject) => {
-            let platform = '';
-            let resourceArn = resource.id;
-
-            if (resource.details) {
-                if (resource.details.awsEc2Instance) {
-                    platform = resource.details.awsEc2Instance.platform;
-                } else if (resource.details.awsEcrContainerImage) {
-                    platform = resource.details.awsEcrContainerImage.platform;
-                }
-            }
-
-            this.db.run(
-                `INSERT INTO resources
-                 (vulnerability_id, resource_id, resource_type, resource_arn,
-                  platform, region, details, tags)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    vulnerabilityId,
-                    resource.id,
-                    resource.type,
-                    resourceArn,
-                    platform,
-                    resource.region,
-                    JSON.stringify(resource.details),
-                    JSON.stringify(resource.tags)
-                ],
-                function(err) {
-                    if (err) reject(err);
-                    else resolve(this.lastID);
-                }
-            );
-        });
-    }
-
-    async insertPackage(vulnerabilityId, pkg) {
-        return new Promise((resolve, reject) => {
-            this.db.run(
-                `INSERT INTO packages
-                 (vulnerability_id, name, version, fixed_version, package_manager, file_path)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    vulnerabilityId,
-                    pkg.name,
-                    pkg.version,
-                    pkg.fixedInVersion || pkg.fixedVersion,
-                    pkg.packageManager,
-                    pkg.filePath
-                ],
-                function(err) {
-                    if (err) reject(err);
-                    else resolve(this.lastID);
-                }
-            );
-        });
-    }
-
-    async insertReference(vulnerabilityId, url) {
-        return new Promise((resolve, reject) => {
-            this.db.run(
-                `INSERT INTO "references" (vulnerability_id, url) VALUES (?, ?)`,
-                [vulnerabilityId, url],
-                function(err) {
-                    if (err) reject(err);
-                    else resolve(this.lastID);
-                }
-            );
-        });
-    }
-
-    async getSummary(filters = {}) {
-        return new Promise((resolve, reject) => {
-            const summary = {};
-            let whereClause = '';
-            const params = [];
-
-            if (filters.awsAccountId) {
-                whereClause = ' WHERE aws_account_id = ?';
-                params.push(filters.awsAccountId);
-            }
-
-            this.db.get(
-                `SELECT COUNT(*) as total FROM vulnerabilities${whereClause}`,
-                params,
-                (err, row) => {
-                    if (err) return reject(err);
-                    summary.total = row.total;
-
-                    this.db.get(
-                        `SELECT COUNT(*) as critical FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'CRITICAL'`,
-                        filters.awsAccountId ? [filters.awsAccountId] : [],
-                        (err, row) => {
-                            if (err) return reject(err);
-                            summary.critical = row.critical;
-
-                            this.db.get(
-                                `SELECT COUNT(*) as high FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'HIGH'`,
-                                filters.awsAccountId ? [filters.awsAccountId] : [],
-                                (err, row) => {
-                                    if (err) return reject(err);
-                                    summary.high = row.high;
-
-                                    this.db.get(
-                                        `SELECT COUNT(*) as medium FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'MEDIUM'`,
-                                        filters.awsAccountId ? [filters.awsAccountId] : [],
-                                        (err, row) => {
-                                            if (err) return reject(err);
-                                            summary.medium = row.medium;
-
-                                            this.db.get(
-                                                `SELECT COUNT(*) as low FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'LOW'`,
-                                                filters.awsAccountId ? [filters.awsAccountId] : [],
-                                                (err, row) => {
-                                                    if (err) return reject(err);
-                                                    summary.low = row.low;
-
-                                                    this.db.get(
-                                                        `SELECT COUNT(*) as fixable FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} fix_available = 'YES'`,
-                                                        filters.awsAccountId ? [filters.awsAccountId] : [],
-                                                        (err, row) => {
-                                                            if (err) return reject(err);
-                                                            summary.fixable = row.fixable;
-                                                            resolve(summary);
-                                                        }
-                                                    );
-                                                }
-                                            );
-                                        }
-                                    );
-                                }
-                            );
-                        }
-                    );
-                }
-            );
-        });
+    async getAllReports() {
+        return await this.service.getAllReports();
     }
 
     async getRecentReports(limit = 5) {
-        return new Promise((resolve, reject) => {
-            this.db.all(
-                `SELECT * FROM reports ORDER BY upload_date DESC LIMIT ?`,
-                [limit],
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                }
-            );
-        });
-    }
-
-    async getVulnerabilities(filters = {}) {
-        return new Promise((resolve, reject) => {
-            let query = `
-                SELECT DISTINCT v.*, r.resource_type, r.platform, r.resource_id, r.details, r.tags
-                FROM vulnerabilities v
-                LEFT JOIN resources r ON v.id = r.vulnerability_id
-                WHERE 1=1
-            `;
-            const params = [];
-
-            if (filters.status) {
-                query += ' AND v.status = ?';
-                params.push(filters.status);
-            }
-
-            if (filters.severity) {
-                query += ' AND v.severity = ?';
-                params.push(filters.severity);
-            }
-
-            if (filters.resourceType) {
-                query += ' AND r.resource_type = ?';
-                params.push(filters.resourceType);
-            }
-
-            if (filters.platform) {
-                query += ' AND r.platform LIKE ?';
-                params.push(`%${filters.platform}%`);
-            }
-
-            if (filters.fixAvailable) {
-                query += ' AND v.fix_available = ?';
-                params.push(filters.fixAvailable);
-            }
-
-            if (filters.vulnerabilityId) {
-                query += ' AND v.vulnerability_id LIKE ?';
-                params.push(`%${filters.vulnerabilityId}%`);
-            }
-
-            if (filters.resourceId) {
-                query += ' AND r.resource_id LIKE ?';
-                params.push(`%${filters.resourceId}%`);
-            }
-
-            if (filters.search) {
-                query += ' AND (v.title LIKE ? OR v.description LIKE ? OR v.vulnerability_id LIKE ?)';
-                params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
-            }
-
-            if (filters.lastObservedAt) {
-                query += ' AND v.last_observed_at IS NOT NULL AND v.last_observed_at <= ?';
-                params.push(filters.lastObservedAt);
-            }
-
-            if (filters.awsAccountId) {
-                query += ' AND v.aws_account_id = ?';
-                params.push(filters.awsAccountId);
-            }
-
-            query += ' ORDER BY v.severity DESC, v.inspector_score DESC';
-
-            this.db.all(query, params, async (err, rows) => {
-                if (err) return reject(err);
-
-                // Get packages and references for each vulnerability
-                const enrichedRows = await Promise.all(rows.map(async (row) => {
-                    const packages = await this.getPackagesByVulnerabilityId(row.id);
-                    const references = await this.getReferencesByVulnerabilityId(row.id);
-
-                    return {
-                        ...row,
-                        packages,
-                        references,
-                        details: row.details ? JSON.parse(row.details) : null,
-                        tags: row.tags ? JSON.parse(row.tags) : null
-                    };
-                }));
-
-                resolve(enrichedRows);
-            });
-        });
-    }
-
-    async getPackagesByVulnerabilityId(vulnerabilityId) {
-        return new Promise((resolve, reject) => {
-            this.db.all(
-                `SELECT * FROM packages WHERE vulnerability_id = ?`,
-                [vulnerabilityId],
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                }
-            );
-        });
-    }
-
-    async getReferencesByVulnerabilityId(vulnerabilityId) {
-        return new Promise((resolve, reject) => {
-            this.db.all(
-                `SELECT url FROM "references" WHERE vulnerability_id = ?`,
-                [vulnerabilityId],
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows.map(r => r.url));
-                }
-            );
-        });
-    }
-
-    async getVulnerabilitiesByIds(ids) {
-        if (!ids || ids.length === 0) {
-            return [];
+        if (this.service.getRecentReports) {
+            return await this.service.getRecentReports(limit);
         }
 
-        const placeholders = ids.map(() => '?').join(',');
-
-        return new Promise((resolve, reject) => {
-            const query = `
-                SELECT v.*, r.resource_type, r.platform, r.resource_id, r.details, r.tags
-                FROM vulnerabilities v
-                LEFT JOIN resources r ON v.id = r.vulnerability_id
-                WHERE v.id IN (${placeholders})
-            `;
-
-            this.db.all(query, ids, async (err, rows) => {
-                if (err) return reject(err);
-
-                const enrichedRows = await Promise.all(rows.map(async (row) => {
-                    const packages = await this.getPackagesByVulnerabilityId(row.id);
-                    const references = await this.getReferencesByVulnerabilityId(row.id);
-
-                    return {
-                        ...row,
-                        packages,
-                        references,
-                        details: row.details ? JSON.parse(row.details) : null,
-                        tags: row.tags ? JSON.parse(row.tags) : null
-                    };
-                }));
-
-                resolve(enrichedRows);
-            });
-        });
+        const reports = await this.getAllReports();
+        return reports.slice(0, limit);
     }
 
-    async getVulnerabilitiesGroupedByCVE(filters = {}) {
-        return new Promise((resolve, reject) => {
-            let query = `
-                SELECT
-                    v.vulnerability_id,
-                    v.title,
-                    v.description,
-                    v.severity,
-                    v.status,
-                    v.fix_available,
-                    v.inspector_score,
-                    v.epss_score,
-                    v.exploit_available,
-                    COUNT(DISTINCT r.resource_id) as affected_resources_count,
-                    GROUP_CONCAT(DISTINCT r.resource_id) as resource_ids,
-                    GROUP_CONCAT(DISTINCT r.resource_type) as resource_types,
-                    GROUP_CONCAT(DISTINCT r.platform) as platforms,
-                    MIN(v.first_observed_at) as first_observed_at,
-                    MAX(v.last_observed_at) as last_observed_at,
-                    MAX(v.id) as id
-                FROM vulnerabilities v
-                LEFT JOIN resources r ON v.id = r.vulnerability_id
-                WHERE 1=1
-            `;
-            const params = [];
-
-            if (filters.status) {
-                query += ' AND v.status = ?';
-                params.push(filters.status);
-            }
-
-            if (filters.severity) {
-                query += ' AND v.severity = ?';
-                params.push(filters.severity);
-            }
-
-            if (filters.resourceType) {
-                query += ' AND r.resource_type = ?';
-                params.push(filters.resourceType);
-            }
-
-            if (filters.platform) {
-                query += ' AND r.platform LIKE ?';
-                params.push(`%${filters.platform}%`);
-            }
-
-            if (filters.fixAvailable) {
-                query += ' AND v.fix_available = ?';
-                params.push(filters.fixAvailable);
-            }
-
-            if (filters.vulnerabilityId) {
-                query += ' AND v.vulnerability_id LIKE ?';
-                params.push(`%${filters.vulnerabilityId}%`);
-            }
-
-            if (filters.resourceId) {
-                query += ' AND r.resource_id LIKE ?';
-                params.push(`%${filters.resourceId}%`);
-            }
-
-            if (filters.search) {
-                query += ' AND (v.title LIKE ? OR v.description LIKE ? OR v.vulnerability_id LIKE ?)';
-                params.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
-            }
-
-            if (filters.lastObservedAt) {
-                query += ' AND v.last_observed_at IS NOT NULL AND v.last_observed_at <= ?';
-                params.push(filters.lastObservedAt);
-            }
-
-            if (filters.awsAccountId) {
-                query += ' AND v.aws_account_id = ?';
-                params.push(filters.awsAccountId);
-            }
-
-            query += ' GROUP BY v.vulnerability_id, v.title, v.description, v.severity, v.status, v.fix_available, v.inspector_score, v.epss_score, v.exploit_available';
-            query += ' ORDER BY v.severity DESC, v.inspector_score DESC';
-
-            this.db.all(query, params, async (err, rows) => {
-                if (err) return reject(err);
-
-                // Get detailed resource information and packages for each grouped vulnerability
-                const enrichedRows = await Promise.all(rows.map(async (row) => {
-                    // Get all resources for this CVE
-                    const resources = await this.getResourcesByCVE(row.vulnerability_id);
-
-                    // Get packages (from the first matching vulnerability)
-                    const packages = await this.getPackagesByVulnerabilityId(row.id);
-
-                    // Get references
-                    const references = await this.getReferencesByVulnerabilityId(row.id);
-
-                    return {
-                        ...row,
-                        resources,
-                        packages,
-                        references,
-                        resource_ids: row.resource_ids ? row.resource_ids.split(',') : [],
-                        resource_types: row.resource_types ? row.resource_types.split(',') : [],
-                        platforms: row.platforms ? row.platforms.split(',').filter(p => p && p !== 'null') : []
-                    };
-                }));
-
-                resolve(enrichedRows);
-            });
-        });
+    async getReportById(id) {
+        return await this.service.getReportById(id);
     }
 
-    async getResourcesByCVE(vulnerabilityId) {
-        return new Promise((resolve, reject) => {
-            const query = `
-                SELECT DISTINCT
-                    r.resource_id,
-                    r.resource_type,
-                    r.platform,
-                    r.region,
-                    r.details,
-                    r.tags,
-                    v.last_observed_at
-                FROM resources r
-                JOIN vulnerabilities v ON r.vulnerability_id = v.id
-                WHERE v.vulnerability_id = ?
-            `;
+    async insertReport(filenameOrData, vulnerabilityCount, awsAccountId, reportRunDate = null, fileSize = null, status = 'PROCESSING', errorMessage = null) {
+        if (this.service.insertReport) {
+            if (filenameOrData && typeof filenameOrData === 'object' && !Array.isArray(filenameOrData)) {
+                return await this.service.insertReport(filenameOrData);
+            }
 
-            this.db.all(query, [vulnerabilityId], (err, rows) => {
-                if (err) reject(err);
-                else {
-                    const processedRows = rows.map(row => ({
-                        ...row,
-                        details: row.details ? JSON.parse(row.details) : null,
-                        tags: row.tags ? JSON.parse(row.tags) : null
-                    }));
-                    resolve(processedRows);
-                }
-            });
-        });
+            const payload = {
+                filename: filenameOrData,
+                vulnerabilityCount: vulnerabilityCount ?? 0,
+                awsAccountId: awsAccountId || null,
+                reportRunDate: reportRunDate || null,
+                fileSize: fileSize ?? null,
+                status: status ?? 'PROCESSING',
+                errorMessage: errorMessage ?? null
+            };
+
+            return await this.service.insertReport(payload);
+        }
+
+        throw new Error('insertReport not supported by current database service');
+    }
+
+    async updateReport(id, updates) {
+        return await this.service.updateReport(id, updates);
+    }
+
+    async deleteReport(id) {
+        return await this.service.deleteReport(id);
+    }
+
+    async getVulnerabilities(filters = {}, includeRelated = true, pagination = {}) {
+        return await this.service.getVulnerabilities(filters, includeRelated, pagination);
+    }
+
+    async getVulnerabilitiesCount(filters = {}) {
+        if (this.service.getVulnerabilitiesCount) {
+            return await this.service.getVulnerabilitiesCount(filters);
+        }
+        // Fallback for SQLite: get all vulnerabilities and count them
+        const vulnerabilities = await this.service.getVulnerabilities(filters);
+        return vulnerabilities.length;
     }
 
     async getFilterOptions() {
-        return new Promise((resolve, reject) => {
-            const options = {};
+        if (this.service.getFilterOptions) {
+            return await this.service.getFilterOptions();
+        }
 
-            this.db.all(
-                `SELECT DISTINCT status FROM vulnerabilities WHERE status IS NOT NULL`,
-                (err, rows) => {
-                    if (err) return reject(err);
-                    options.statuses = rows.map(r => r.status);
+        const vulnerabilities = await this.getVulnerabilities();
+        const options = {
+            statuses: new Set(),
+            severities: new Set(),
+            resourceTypes: new Set(),
+            platforms: new Set(),
+            awsAccountIds: new Set()
+        };
 
-                    this.db.all(
-                        `SELECT DISTINCT severity FROM vulnerabilities WHERE severity IS NOT NULL`,
-                        (err, rows) => {
-                            if (err) return reject(err);
-                            options.severities = rows.map(r => r.severity);
+        for (const vuln of vulnerabilities) {
+            if (vuln.status) options.statuses.add(vuln.status);
+            if (vuln.severity) options.severities.add(vuln.severity);
+            if (vuln.resource_type) options.resourceTypes.add(vuln.resource_type);
+            if (vuln.platform) options.platforms.add(vuln.platform);
+            if (vuln.aws_account_id) options.awsAccountIds.add(vuln.aws_account_id);
+        }
 
-                            this.db.all(
-                                `SELECT DISTINCT resource_type FROM resources WHERE resource_type IS NOT NULL`,
-                                (err, rows) => {
-                                    if (err) return reject(err);
-                                    options.resourceTypes = rows.map(r => r.resource_type);
-
-                                    this.db.all(
-                                        `SELECT DISTINCT platform FROM resources WHERE platform IS NOT NULL AND platform != ''`,
-                                        (err, rows) => {
-                                            if (err) return reject(err);
-                                            options.platforms = rows.map(r => r.platform);
-
-                                            this.db.all(
-                                                `SELECT DISTINCT aws_account_id FROM vulnerabilities WHERE aws_account_id IS NOT NULL AND aws_account_id != ''`,
-                                                (err, rows) => {
-                                                    if (err) return reject(err);
-                                                    options.awsAccountIds = rows.map(r => r.aws_account_id);
-                                                    resolve(options);
-                                                }
-                                            );
-                                        }
-                                    );
-                                }
-                            );
-                        }
-                    );
-                }
-            );
-        });
+        return {
+            statuses: Array.from(options.statuses),
+            severities: Array.from(options.severities),
+            resourceTypes: Array.from(options.resourceTypes),
+            platforms: Array.from(options.platforms),
+            awsAccountIds: Array.from(options.awsAccountIds)
+        };
     }
 
-    async getAllReports() {
-        return new Promise((resolve, reject) => {
-            this.db.all(
-                `SELECT * FROM reports ORDER BY upload_date DESC`,
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
-                }
-            );
-        });
+    async getVulnerabilityById(id) {
+        return await this.service.getVulnerabilityById(id);
     }
 
-    async deleteReport(reportId) {
-        return new Promise((resolve, reject) => {
-            this.db.serialize(() => {
-                this.db.run('BEGIN TRANSACTION');
+    async getVulnerabilitiesByIds(ids = []) {
+        if (this.service.getVulnerabilitiesByIds) {
+            return await this.service.getVulnerabilitiesByIds(ids);
+        }
 
-                // Delete references
-                this.db.run(
-                    `DELETE FROM "references" WHERE vulnerability_id IN
-                     (SELECT id FROM vulnerabilities WHERE report_id = ?)`,
-                    [reportId]
-                );
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return [];
+        }
 
-                // Delete packages
-                this.db.run(
-                    `DELETE FROM packages WHERE vulnerability_id IN
-                     (SELECT id FROM vulnerabilities WHERE report_id = ?)`,
-                    [reportId]
-                );
-
-                // Delete resources
-                this.db.run(
-                    `DELETE FROM resources WHERE vulnerability_id IN
-                     (SELECT id FROM vulnerabilities WHERE report_id = ?)`,
-                    [reportId]
-                );
-
-                // Delete vulnerabilities
-                this.db.run(
-                    `DELETE FROM vulnerabilities WHERE report_id = ?`,
-                    [reportId]
-                );
-
-                // Delete report
-                this.db.run(
-                    `DELETE FROM reports WHERE id = ?`,
-                    [reportId],
-                    (err) => {
-                        if (err) {
-                            this.db.run('ROLLBACK');
-                            reject(err);
-                        } else {
-                            this.db.run('COMMIT');
-                            resolve();
-                        }
-                    }
-                );
-            });
-        });
+        const allVulnerabilities = await this.getVulnerabilities();
+        const idSet = new Set(ids.map(id => Number(id)));
+        return allVulnerabilities.filter(vuln => idSet.has(Number(vuln.id)));
     }
 
-    // ============================================================================
-    // HISTORY TRACKING METHODS
-    // ============================================================================
+    async getVulnerabilitiesGroupedByCVE(filters = {}) {
+        if (this.service.getVulnerabilitiesGroupedByCVE) {
+            return await this.service.getVulnerabilitiesGroupedByCVE(filters);
+        }
 
-    /**
-     * Archive current vulnerabilities to history tables before clearing them
-     * @param {number} reportId - Report ID that vulnerabilities came from
-     * @param {object} transaction - Optional transaction context
-     * @returns {Promise<number>} Count of archived records
-     */
-    async archiveVulnerabilities(reportId, transaction = null) {
-        return new Promise((resolve, reject) => {
-            const db = transaction || this.db;
+        // Simple fallback: group in application memory
+        const vulnerabilities = await this.getVulnerabilities(filters);
+        const groups = {};
 
-            // First, get count of current vulnerabilities to archive
-            db.get('SELECT COUNT(*) as count FROM vulnerabilities', [], (err, result) => {
-                if (err) return reject(err);
+        for (const vuln of vulnerabilities) {
+            const key = vuln.cve_id || vuln.vulnerability_id || 'UNKNOWN';
+            if (!groups[key]) {
+                groups[key] = {
+                    cve_id: key,
+                    vulnerabilities: []
+                };
+            }
+            groups[key].vulnerabilities.push(vuln);
+        }
 
-                const archiveCount = result.count;
-
-                if (archiveCount === 0) {
-                    return resolve(0);
-                }
-
-                // Archive vulnerabilities to history table
-                db.run(`
-                    INSERT INTO vulnerability_history
-                    (finding_arn, vulnerability_id, title, severity, status, fix_available,
-                     inspector_score, first_observed_at, last_observed_at, archived_at,
-                     report_run_date, original_report_id, archived_from_report_id)
-                    SELECT
-                        v.finding_arn, v.vulnerability_id, v.title, v.severity, v.status, v.fix_available,
-                        v.inspector_score, v.first_observed_at, v.last_observed_at, CURRENT_TIMESTAMP,
-                        r.report_run_date, v.report_id, ?
-                    FROM vulnerabilities v
-                    LEFT JOIN reports r ON r.id = v.report_id
-                `, [reportId], (err) => {
-                    if (err) return reject(err);
-
-                    // Archive associated resources
-                    db.run(`
-                        INSERT INTO resource_history
-                        (history_id, resource_id, resource_type, platform, archived_at)
-                        SELECT
-                            h.id, r.resource_id, r.resource_type, r.platform, CURRENT_TIMESTAMP
-                        FROM vulnerability_history h
-                        JOIN vulnerabilities v ON v.finding_arn = h.finding_arn
-                            AND h.archived_from_report_id = ?
-                        JOIN resources r ON r.vulnerability_id = v.id
-                    `, [reportId], (err) => {
-                        if (err) return reject(err);
-                        resolve(archiveCount);
-                    });
-                });
-            });
-        });
+        return Object.values(groups);
     }
 
-    /**
-     * Get fixed vulnerabilities (those in history but not in current data)
-     * @param {object} filters - Filtering options
-     * @returns {Promise<array>} Array of fixed vulnerabilities with derived fields
-     */
     async getFixedVulnerabilities(filters = {}) {
-        return new Promise((resolve, reject) => {
-            let query = `
-                SELECT DISTINCT
-                    h.finding_arn,
-                    h.vulnerability_id,
-                    h.title,
-                    h.severity,
-                    h.status,
-                    h.fix_available,
-                    h.inspector_score,
-                    h.first_observed_at,
-                    h.last_observed_at,
-                    h.archived_at as fixed_date,
-                    h.report_run_date,
-                    CASE
-                        WHEN h.first_observed_at IS NOT NULL
-                        THEN ROUND((julianday(h.archived_at) - julianday(h.first_observed_at)))
-                        ELSE NULL
-                    END as days_active,
-                    CASE WHEN h.fix_available = 'YES' THEN 1 ELSE 0 END as fix_was_available,
-                    GROUP_CONCAT(DISTINCT rh.resource_id) as affected_resources,
-                    GROUP_CONCAT(DISTINCT rh.resource_type) as resource_types
-                FROM vulnerability_history h
-                LEFT JOIN resource_history rh ON rh.history_id = h.id
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM vulnerabilities v
-                    WHERE v.finding_arn = h.finding_arn
-                       OR (v.vulnerability_id = h.vulnerability_id
-                           AND v.vulnerability_id IS NOT NULL
-                           AND h.vulnerability_id IS NOT NULL)
-                )
-            `;
-            const params = [];
+        if (this.service.getFixedVulnerabilities) {
+            return await this.service.getFixedVulnerabilities(filters);
+        }
 
-            if (filters.severity) {
-                query += ' AND h.severity = ?';
-                params.push(filters.severity);
-            }
-
-            if (filters.fixedAfter) {
-                query += ' AND h.archived_at >= ?';
-                params.push(filters.fixedAfter);
-            }
-
-            if (filters.fixedBefore) {
-                query += ' AND h.archived_at <= ?';
-                params.push(filters.fixedBefore);
-            }
-
-            if (filters.resourceType) {
-                query += ' AND EXISTS (SELECT 1 FROM resource_history rh2 WHERE rh2.history_id = h.id AND rh2.resource_type = ?)';
-                params.push(filters.resourceType);
-            }
-
-            query += ' GROUP BY h.finding_arn, h.vulnerability_id, h.title, h.severity, h.status, h.fix_available, h.inspector_score, h.first_observed_at, h.last_observed_at, h.archived_at';
-            query += ' ORDER BY h.archived_at DESC, h.severity DESC';
-
-            // Add pagination
-            const limit = filters.limit || 50;
-            const offset = filters.offset || 0;
-            query += ` LIMIT ? OFFSET ?`;
-            params.push(limit, offset);
-
-            this.db.all(query, params, (err, rows) => {
-                if (err) return reject(err);
-
-                // Process results to convert string arrays and parse data
-                const processedRows = rows.map(row => ({
-                    ...row,
-                    affected_resources: row.affected_resources ? row.affected_resources.split(',') : [],
-                    resource_types: row.resource_types ? row.resource_types.split(',') : [],
-                    fix_was_available: Boolean(row.fix_was_available)
-                }));
-
-                resolve(processedRows);
-            });
-        });
+        return [];
     }
 
-    /**
-     * Get historical timeline for a specific vulnerability
-     * @param {string} findingArn - AWS Inspector finding ARN
-     * @returns {Promise<object>} Vulnerability history timeline
-     */
     async getVulnerabilityTimeline(findingArn) {
-        return new Promise((resolve, reject) => {
-            // First check if vulnerability exists in current data
-            this.db.get(
-                'SELECT finding_arn FROM vulnerabilities WHERE finding_arn = ?',
-                [findingArn],
-                (err, currentRow) => {
-                    if (err) return reject(err);
+        if (this.service.getVulnerabilityTimeline) {
+            return await this.service.getVulnerabilityTimeline(findingArn);
+        }
 
-                    const currentStatus = currentRow ? 'ACTIVE' : 'FIXED';
-
-                    // Get historical records
-                    this.db.all(`
-                        SELECT
-                            h.vulnerability_id,
-                            h.title,
-                            h.severity,
-                            h.status,
-                            h.fix_available,
-                            h.inspector_score,
-                            h.first_observed_at,
-                            h.last_observed_at,
-                            h.archived_at,
-                            h.archived_from_report_id
-                        FROM vulnerability_history h
-                        WHERE h.finding_arn = ?
-                        ORDER BY h.archived_at DESC
-                    `, [findingArn], (err, historyRows) => {
-                        if (err) return reject(err);
-
-                        if (historyRows.length === 0 && !currentRow) {
-                            return reject(new Error('Vulnerability not found in history or current data'));
-                        }
-
-                        resolve({
-                            finding_arn: findingArn,
-                            current_status: currentStatus,
-                            history: historyRows
-                        });
-                    });
-                }
-            );
-        });
+        return {
+            findingArn,
+            current: null,
+            history: []
+        };
     }
 
-    /**
-     * Create a new upload event for tracking workflow state
-     * @param {string} filename - Original filename of uploaded report
-     * @returns {Promise<string>} Upload ID
-     */
-    async createUploadEvent(filename) {
-        return new Promise((resolve, reject) => {
-            const uploadId = require('crypto').randomUUID();
+    async insertVulnerability(reportId, vulnerability) {
+        if (!this.service.insertVulnerability) {
+            throw new Error('insertVulnerability not supported by current database service');
+        }
 
-            this.db.run(`
-                INSERT INTO upload_events (upload_id, filename, status, started_at)
-                VALUES (?, ?, 'STARTED', CURRENT_TIMESTAMP)
-            `, [uploadId, filename], function(err) {
-                if (err) reject(err);
-                else resolve(uploadId);
-            });
-        });
+        if (this.service.insertVulnerability.length >= 2) {
+            return await this.service.insertVulnerability(reportId, vulnerability);
+        }
+
+        return await this.service.insertVulnerability({ reportId, vulnerability });
     }
 
-    /**
-     * Update upload event status and metadata
-     * @param {string} uploadId - Upload ID to update
-     * @param {string} status - New status
-     * @param {object} metadata - Additional metadata (records_archived, records_imported, error_message)
-     * @returns {Promise<void>}
-     */
-    async updateUploadEvent(uploadId, status, metadata = {}) {
-        return new Promise((resolve, reject) => {
-            let updateFields = ['status = ?'];
-            let params = [status];
+    async insertResource(vulnerabilityId, resource) {
+        if (this.service.insertResource) {
+            return await this.service.insertResource(vulnerabilityId, resource);
+        }
 
-            if (metadata.records_archived !== undefined) {
-                updateFields.push('records_archived = ?');
-                params.push(metadata.records_archived);
-            }
-
-            if (metadata.records_imported !== undefined) {
-                updateFields.push('records_imported = ?');
-                params.push(metadata.records_imported);
-            }
-
-            if (metadata.error_message) {
-                updateFields.push('error_message = ?');
-                params.push(metadata.error_message);
-            }
-
-            if (status === 'COMPLETED' || status === 'FAILED') {
-                updateFields.push('completed_at = CURRENT_TIMESTAMP');
-            }
-
-            params.push(uploadId);
-
-            this.db.run(`
-                UPDATE upload_events
-                SET ${updateFields.join(', ')}
-                WHERE upload_id = ?
-            `, params, function(err) {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        throw new Error('insertResource not supported by current database service');
     }
 
-    /**
-     * Clear current vulnerability data tables (for upload workflow)
-     * @param {object} transaction - Optional transaction context
-     * @returns {Promise<void>}
-     */
-    async clearCurrentTables(transaction = null) {
-        return new Promise((resolve, reject) => {
-            const db = transaction || this.db;
+    async insertPackage(vulnerabilityId, pkg) {
+        if (this.service.insertPackage) {
+            return await this.service.insertPackage(vulnerabilityId, pkg);
+        }
 
-            db.serialize(() => {
-                // Clear in reverse dependency order
-                db.run('DELETE FROM "references"', (err) => {
-                    if (err) return reject(err);
-
-                    db.run('DELETE FROM packages', (err) => {
-                        if (err) return reject(err);
-
-                        db.run('DELETE FROM resources', (err) => {
-                            if (err) return reject(err);
-
-                            db.run('DELETE FROM vulnerabilities', (err) => {
-                                if (err) return reject(err);
-                                resolve();
-                            });
-                        });
-                    });
-                });
-            });
-        });
+        throw new Error('insertPackage not supported by current database service');
     }
 
-    /**
-     * Get upload events history
-     * @param {object} filters - Filtering options
-     * @returns {Promise<array>} Upload events
-     */
-    async getUploadEvents(filters = {}) {
-        return new Promise((resolve, reject) => {
-            let query = 'SELECT * FROM upload_events WHERE 1=1';
-            const params = [];
+    async insertReference(vulnerabilityId, url) {
+        if (this.service.insertReference) {
+            return await this.service.insertReference(vulnerabilityId, url);
+        }
 
-            if (filters.status) {
-                query += ' AND status = ?';
-                params.push(filters.status);
-            }
-
-            if (filters.since) {
-                query += ' AND started_at >= ?';
-                params.push(filters.since);
-            }
-
-            query += ' ORDER BY started_at DESC';
-
-            if (filters.limit) {
-                query += ' LIMIT ?';
-                params.push(filters.limit);
-            }
-
-            this.db.all(query, params, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        throw new Error('insertReference not supported by current database service');
     }
 
-    // ============================================================================
-    // TRANSACTION SUPPORT METHODS
-    // ============================================================================
+    async insertVulnerabilities(vulnArray) {
+        if (this.service.insertVulnerabilities) {
+            return await this.service.insertVulnerabilities(vulnArray);
+        } else {
+            // Fallback for SQLite: insert one by one
+            const ids = [];
+            for (const vuln of vulnArray) {
+                const id = await this.service.insertVulnerability(vuln);
+                ids.push(id);
+            }
+            return ids;
+        }
+    }
 
-    /**
-     * Begin a database transaction
-     * @returns {Promise<void>}
-     */
+    async updateVulnerability(id, updates) {
+        return await this.service.updateVulnerability(id, updates);
+    }
+
+    async deleteVulnerability(id) {
+        return await this.service.deleteVulnerability(id);
+    }
+
+    async archiveVulnerabilities(vulnerabilityIds) {
+        if (this.service.archiveVulnerabilities) {
+            return await this.service.archiveVulnerabilities(vulnerabilityIds);
+        } else {
+            // Fallback implementation for SQLite
+            console.warn('Archive functionality not available in SQLite mode');
+            return 0;
+        }
+    }
+
+    async clearCurrentTables() {
+        if (this.service.clearCurrentTables) {
+            return await this.service.clearCurrentTables();
+        }
+
+        throw new Error('clearCurrentTables not supported by current database service');
+    }
+
     async beginTransaction() {
-        return new Promise((resolve, reject) => {
-            this.db.run('BEGIN TRANSACTION', (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        if (this.service.beginTransaction) {
+            return await this.service.beginTransaction();
+        }
+
+        console.warn('beginTransaction not supported by current database service; operations will run without explicit transaction');
+        return null;
     }
 
-    /**
-     * Commit current transaction
-     * @returns {Promise<void>}
-     */
     async commitTransaction() {
-        return new Promise((resolve, reject) => {
-            this.db.run('COMMIT', (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        if (this.service.commitTransaction) {
+            return await this.service.commitTransaction();
+        }
+
+        console.warn('commitTransaction not supported by current database service; assuming auto-commit');
+        return null;
     }
 
-    /**
-     * Rollback current transaction
-     * @returns {Promise<void>}
-     */
     async rollbackTransaction() {
-        return new Promise((resolve, reject) => {
-            this.db.run('ROLLBACK', (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        if (this.service.rollbackTransaction) {
+            return await this.service.rollbackTransaction();
+        }
+
+        console.warn('rollbackTransaction not supported by current database service; nothing to rollback');
+        return null;
+    }
+
+    async createUploadEvent(filename) {
+        if (this.service.createUploadEvent) {
+            return await this.service.createUploadEvent(filename);
+        }
+
+        throw new Error('createUploadEvent not supported by current database service');
+    }
+
+    async updateUploadEvent(uploadId, status, metadata = {}) {
+        if (this.service.updateUploadEvent) {
+            return await this.service.updateUploadEvent(uploadId, status, metadata);
+        }
+
+        throw new Error('updateUploadEvent not supported by current database service');
+    }
+
+    async getUploadEvents(filters = {}) {
+        if (this.service.getUploadEvents) {
+            return await this.service.getUploadEvents(filters);
+        }
+
+        return [];
+    }
+
+    async getSummary(filters = {}) {
+        if (this.service.getSummary) {
+            return await this.service.getSummary(filters);
+        }
+
+        const summary = {
+            total: 0,
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            active: 0,
+            fixed: 0,
+            fixable: 0
+        };
+
+        const vulnerabilities = await this.getVulnerabilities(filters);
+
+        for (const vuln of vulnerabilities) {
+            summary.total += 1;
+
+            switch ((vuln.severity || '').toUpperCase()) {
+                case 'CRITICAL':
+                    summary.critical += 1;
+                    break;
+                case 'HIGH':
+                    summary.high += 1;
+                    break;
+                case 'MEDIUM':
+                    summary.medium += 1;
+                    break;
+                case 'LOW':
+                    summary.low += 1;
+                    break;
+                default:
+                    break;
+            }
+
+            const status = (vuln.status || '').toUpperCase();
+            if (status === 'ACTIVE' || !status) {
+                summary.active += 1;
+            }
+            if (status === 'FIXED') {
+                summary.fixed += 1;
+            }
+
+            if ((vuln.fix_available || '').toUpperCase() === 'YES') {
+                summary.fixable += 1;
+            }
+        }
+
+        return summary;
+    }
+
+    // Settings operations (new for PostgreSQL)
+    async getAllSettings() {
+        if (this.service.getAllSettings) {
+            return await this.service.getAllSettings();
+        } else {
+            return [];
+        }
+    }
+
+    async getSettingByKey(key) {
+        if (this.service.getSettingByKey) {
+            return await this.service.getSettingByKey(key);
+        } else {
+            return null;
+        }
+    }
+
+    async updateSetting(key, value, type = 'string') {
+        if (this.service.updateSetting) {
+            return await this.service.updateSetting(key, value, type);
+        } else {
+            return false;
+        }
+    }
+
+    async insertSetting(settingData) {
+        if (this.service.insertSetting) {
+            return await this.service.insertSetting(settingData);
+        } else {
+            return 0;
+        }
+    }
+
+    async deleteSetting(key) {
+        if (this.service.deleteSetting) {
+            return await this.service.deleteSetting(key);
+        } else {
+            return false;
+        }
+    }
+
+    // Advanced query operations
+    async getVulnerabilityStatistics() {
+        if (this.service.getVulnerabilityStatistics) {
+            return await this.service.getVulnerabilityStatistics();
+        } else {
+            // Fallback implementation
+            const vulns = await this.service.getVulnerabilities();
+            return {
+                total: vulns.length,
+                critical: vulns.filter(v => v.severity === 'CRITICAL').length,
+                high: vulns.filter(v => v.severity === 'HIGH').length,
+                medium: vulns.filter(v => v.severity === 'MEDIUM').length,
+                low: vulns.filter(v => v.severity === 'LOW').length,
+                active: vulns.filter(v => v.status === 'ACTIVE' || !v.status).length,
+                fixed: vulns.filter(v => v.status === 'FIXED').length
+            };
+        }
+    }
+
+    async getHistoricalTrends(timeRange) {
+        if (this.service.getHistoricalTrends) {
+            return await this.service.getHistoricalTrends(timeRange);
+        } else {
+            return [];
+        }
+    }
+
+    async searchVulnerabilities(searchTerm, filters = {}) {
+        if (this.service.searchVulnerabilities) {
+            return await this.service.searchVulnerabilities(searchTerm, filters);
+        } else {
+            // Simple fallback search
+            const vulns = await this.service.getVulnerabilities(filters);
+            return vulns.filter(v =>
+                v.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                v.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                v.package_name?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+    }
+
+    // Health and monitoring
+    async healthCheck() {
+        if (this.service.healthCheck) {
+            return await this.service.healthCheck();
+        } else {
+            return { healthy: true, service: 'sqlite' };
+        }
+    }
+
+    getPoolStats() {
+        if (this.service.getPoolStats) {
+            return this.service.getPoolStats();
+        } else {
+            return null;
+        }
+    }
+
+    // Transaction support
+    async executeTransaction(callback) {
+        if (this.service.executeTransaction) {
+            return await this.service.executeTransaction(callback);
+        } else {
+            // Simple fallback: execute without transaction for SQLite
+            return await callback(this.service);
+        }
+    }
+
+    // Raw query access
+    async query(text, params = []) {
+        if (this.service.query) {
+            return await this.service.query(text, params);
+        } else {
+            throw new Error('Raw query not supported in SQLite mode');
+        }
+    }
+
+    // Schema validation
+    async validateSchema() {
+        if (this.service.validateSchema) {
+            return await this.service.validateSchema();
+        } else {
+            return { tables: { found: 0, missing: [] } };
+        }
+    }
+
+    // Graceful shutdown
+    async close() {
+        if (this.service && this.service.close) {
+            await this.service.close();
+        }
+        this.initialized = false;
+    }
+
+    // Compatibility methods for existing code
+    isConnected() {
+        if (this.service && this.service.isConnected) {
+            return this.service.isConnected();
+        }
+        return this.initialized;
+    }
+
+    // Legacy SQLite methods (for backward compatibility)
+    async run(query, params = []) {
+        if (this.service.run) {
+            return await this.service.run(query, params);
+        } else if (this.service.query) {
+            const result = await this.service.query(query, params);
+            return {
+                changes: result.rowCount || 0,
+                lastID: result.rows?.[0]?.id || null
+            };
+        }
+        throw new Error('Run method not supported');
+    }
+
+    async all(query, params = []) {
+        if (this.service.all) {
+            return await this.service.all(query, params);
+        } else if (this.service.query) {
+            const result = await this.service.query(query, params);
+            return result.rows || [];
+        }
+        throw new Error('All method not supported');
+    }
+
+    async get(query, params = []) {
+        if (this.service.get) {
+            return await this.service.get(query, params);
+        } else if (this.service.query) {
+            const result = await this.service.query(query, params);
+            return result.rows?.[0] || null;
+        }
+        throw new Error('Get method not supported');
     }
 }
 
