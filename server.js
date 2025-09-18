@@ -38,15 +38,35 @@ const upload = multer({
 const db = new Database();
 
 // Routes
-app.get('/', (req, res) => {
-    res.render('index');
+app.get('/', async (req, res) => {
+    try {
+        const filterOptions = await db.getFilterOptions();
+        res.render('index', {
+            filterOptions,
+            selectedAccountId: req.query.awsAccountId || ''
+        });
+    } catch (error) {
+        res.render('index', {
+            filterOptions: { awsAccountIds: [] },
+            selectedAccountId: ''
+        });
+    }
 });
 
 app.get('/dashboard', async (req, res) => {
     try {
-        const summary = await db.getSummary();
+        const filters = {
+            awsAccountId: req.query.awsAccountId
+        };
+        const summary = await db.getSummary(filters);
         const recentReports = await db.getRecentReports(5);
-        res.render('dashboard', { summary, recentReports });
+        const filterOptions = await db.getFilterOptions();
+        res.render('dashboard', {
+            summary,
+            recentReports,
+            filterOptions,
+            selectedAccountId: req.query.awsAccountId || ''
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -63,7 +83,8 @@ app.get('/vulnerabilities', async (req, res) => {
             vulnerabilityId: req.query.vulnerabilityId,
             resourceId: req.query.resourceId,
             search: req.query.search,
-            lastObservedAt: req.query.lastObservedAt
+            lastObservedAt: req.query.lastObservedAt,
+            awsAccountId: req.query.awsAccountId
         };
 
         const groupByCVE = req.query.groupByCVE === 'true';
@@ -87,7 +108,8 @@ app.get('/vulnerabilities', async (req, res) => {
             filters,
             filterOptions,
             groupByCVE: groupByCVE || false,
-            hasFilters
+            hasFilters,
+            selectedAccountId: req.query.awsAccountId || ''
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -235,7 +257,8 @@ app.get('/api/vulnerabilities', async (req, res) => {
             vulnerabilityId: req.query.vulnerabilityId,
             resourceId: req.query.resourceId,
             search: req.query.search,
-            lastObservedAt: req.query.lastObservedAt
+            lastObservedAt: req.query.lastObservedAt,
+            awsAccountId: req.query.awsAccountId
         };
 
         const vulnerabilities = await db.getVulnerabilities(filters);
@@ -297,9 +320,11 @@ app.delete('/api/reports/:id', async (req, res) => {
 // Fixed Vulnerabilities Report Page
 app.get('/fixed-vulnerabilities', async (req, res) => {
     try {
-        // We'll render the page template here (T014 will implement the template)
+        const filterOptions = await db.getFilterOptions();
         res.render('fixed-vulnerabilities', {
-            title: 'Fixed Vulnerabilities Report'
+            title: 'Fixed Vulnerabilities Report',
+            filterOptions,
+            selectedAccountId: req.query.awsAccountId || ''
         });
     } catch (error) {
         console.error('Fixed vulnerabilities page error:', error);

@@ -10,12 +10,27 @@
     <nav class="navbar">
         <div class="container">
             <h1>AWS Inspector Vulnerability Dashboard</h1>
-            <ul class="nav-links">
-                <li><a href="/">Upload</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
-                <li><a href="/fixed-vulnerabilities" class="active">Fixed Vulnerabilities</a></li>
-            </ul>
+            <div class="nav-content">
+                <ul class="nav-links">
+                    <li><a href="/">Upload</a></li>
+                    <li><a href="/dashboard">Dashboard</a></li>
+                    <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                    <li><a href="/fixed-vulnerabilities" class="active">Fixed Vulnerabilities</a></li>
+                </ul>
+                <div class="nav-filter">
+                    <label for="accountFilter">AWS Account:</label>
+                    <select id="accountFilter" onchange="filterByAccount(this.value)">
+                        <option value="">All Accounts</option>
+                        <% if (typeof filterOptions !== 'undefined' && filterOptions.awsAccountIds) { %>
+                            <% filterOptions.awsAccountIds.forEach(accountId => { %>
+                                <option value="<%= accountId %>" <%= selectedAccountId === accountId ? 'selected' : '' %>>
+                                    <%= accountId %>
+                                </option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -191,6 +206,7 @@
         </div>
     </div>
 
+    <script src="/js/navigation.js"></script>
     <script src="/js/fixed-vulnerabilities.js"></script>
 </body>
 </html>

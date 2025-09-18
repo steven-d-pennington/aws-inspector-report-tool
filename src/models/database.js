@@ -222,42 +222,55 @@ class Database {
         });
     }
 
-    async getSummary() {
+    async getSummary(filters = {}) {
         return new Promise((resolve, reject) => {
             const summary = {};
+            let whereClause = '';
+            const params = [];
+
+            if (filters.awsAccountId) {
+                whereClause = ' WHERE aws_account_id = ?';
+                params.push(filters.awsAccountId);
+            }
 
             this.db.get(
-                `SELECT COUNT(*) as total FROM vulnerabilities`,
+                `SELECT COUNT(*) as total FROM vulnerabilities${whereClause}`,
+                params,
                 (err, row) => {
                     if (err) return reject(err);
                     summary.total = row.total;
 
                     this.db.get(
-                        `SELECT COUNT(*) as critical FROM vulnerabilities WHERE severity = 'CRITICAL'`,
+                        `SELECT COUNT(*) as critical FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'CRITICAL'`,
+                        filters.awsAccountId ? [filters.awsAccountId] : [],
                         (err, row) => {
                             if (err) return reject(err);
                             summary.critical = row.critical;
 
                             this.db.get(
-                                `SELECT COUNT(*) as high FROM vulnerabilities WHERE severity = 'HIGH'`,
+                                `SELECT COUNT(*) as high FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'HIGH'`,
+                                filters.awsAccountId ? [filters.awsAccountId] : [],
                                 (err, row) => {
                                     if (err) return reject(err);
                                     summary.high = row.high;
 
                                     this.db.get(
-                                        `SELECT COUNT(*) as medium FROM vulnerabilities WHERE severity = 'MEDIUM'`,
+                                        `SELECT COUNT(*) as medium FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'MEDIUM'`,
+                                        filters.awsAccountId ? [filters.awsAccountId] : [],
                                         (err, row) => {
                                             if (err) return reject(err);
                                             summary.medium = row.medium;
 
                                             this.db.get(
-                                                `SELECT COUNT(*) as low FROM vulnerabilities WHERE severity = 'LOW'`,
+                                                `SELECT COUNT(*) as low FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} severity = 'LOW'`,
+                                                filters.awsAccountId ? [filters.awsAccountId] : [],
                                                 (err, row) => {
                                                     if (err) return reject(err);
                                                     summary.low = row.low;
 
                                                     this.db.get(
-                                                        `SELECT COUNT(*) as fixable FROM vulnerabilities WHERE fix_available = 'YES'`,
+                                                        `SELECT COUNT(*) as fixable FROM vulnerabilities${whereClause}${whereClause ? ' AND' : ' WHERE'} fix_available = 'YES'`,
+                                                        filters.awsAccountId ? [filters.awsAccountId] : [],
                                                         (err, row) => {
                                                             if (err) return reject(err);
                                                             summary.fixable = row.fixable;
@@ -343,6 +356,11 @@ class Database {
             if (filters.lastObservedAt) {
                 query += ' AND v.last_observed_at IS NOT NULL AND v.last_observed_at <= ?';
                 params.push(filters.lastObservedAt);
+            }
+
+            if (filters.awsAccountId) {
+                query += ' AND v.aws_account_id = ?';
+                params.push(filters.awsAccountId);
             }
 
             query += ' ORDER BY v.severity DESC, v.inspector_score DESC';
@@ -502,6 +520,11 @@ class Database {
                 params.push(filters.lastObservedAt);
             }
 
+            if (filters.awsAccountId) {
+                query += ' AND v.aws_account_id = ?';
+                params.push(filters.awsAccountId);
+            }
+
             query += ' GROUP BY v.vulnerability_id, v.title, v.description, v.severity, v.status, v.fix_available, v.inspector_score, v.epss_score, v.exploit_available';
             query += ' ORDER BY v.severity DESC, v.inspector_score DESC';
 
@@ -592,7 +615,15 @@ class Database {
                                         (err, rows) => {
                                             if (err) return reject(err);
                                             options.platforms = rows.map(r => r.platform);
-                                            resolve(options);
+
+                                            this.db.all(
+                                                `SELECT DISTINCT aws_account_id FROM vulnerabilities WHERE aws_account_id IS NOT NULL AND aws_account_id != ''`,
+                                                (err, rows) => {
+                                                    if (err) return reject(err);
+                                                    options.awsAccountIds = rows.map(r => r.aws_account_id);
+                                                    resolve(options);
+                                                }
+                                            );
                                         }
                                     );
                                 }

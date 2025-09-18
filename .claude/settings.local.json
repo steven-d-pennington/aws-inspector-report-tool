@@ -17,7 +17,9 @@
       "Bash(.specify/scripts/powershell/update-agent-context.ps1 -AgentType claude)",
       "Bash(dir:*)",
       "Bash(.specify/scripts/powershell/check-task-prerequisites.ps1 -Json)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm test)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

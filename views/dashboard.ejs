@@ -10,12 +10,27 @@
     <nav class="navbar">
         <div class="container">
             <h1>AWS Inspector Vulnerability Dashboard</h1>
-            <ul class="nav-links">
-                <li><a href="/">Upload</a></li>
-                <li><a href="/dashboard" class="active">Dashboard</a></li>
-                <li><a href="/vulnerabilities">Vulnerabilities</a></li>
-                <li><a href="/fixed-vulnerabilities">Fixed Vulnerabilities</a></li>
-            </ul>
+            <div class="nav-content">
+                <ul class="nav-links">
+                    <li><a href="/">Upload</a></li>
+                    <li><a href="/dashboard" class="active">Dashboard</a></li>
+                    <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                    <li><a href="/fixed-vulnerabilities">Fixed Vulnerabilities</a></li>
+                </ul>
+                <div class="nav-filter">
+                    <label for="accountFilter">AWS Account:</label>
+                    <select id="accountFilter" onchange="filterByAccount(this.value)">
+                        <option value="">All Accounts</option>
+                        <% if (typeof filterOptions !== 'undefined' && filterOptions.awsAccountIds) { %>
+                            <% filterOptions.awsAccountIds.forEach(accountId => { %>
+                                <option value="<%= accountId %>" <%= selectedAccountId === accountId ? 'selected' : '' %>>
+                                    <%= accountId %>
+                                </option>
+                            <% }) %>
+                        <% } %>
+                    </select>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -26,7 +41,7 @@
         </div>
 
         <div class="summary-cards">
-            <a href="/vulnerabilities?groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card total">
                     <div class="card-icon">📊</div>
                     <div class="card-content">
@@ -36,7 +51,7 @@
                 </div>
             </a>
 
-            <a href="/vulnerabilities?severity=CRITICAL&groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?severity=CRITICAL&groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card critical">
                     <div class="card-icon">🔴</div>
                     <div class="card-content">
@@ -46,7 +61,7 @@
                 </div>
             </a>
 
-            <a href="/vulnerabilities?severity=HIGH&groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?severity=HIGH&groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card high">
                     <div class="card-icon">🟠</div>
                     <div class="card-content">
@@ -56,7 +71,7 @@
                 </div>
             </a>
 
-            <a href="/vulnerabilities?severity=MEDIUM&groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?severity=MEDIUM&groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card medium">
                     <div class="card-icon">🟡</div>
                     <div class="card-content">
@@ -66,7 +81,7 @@
                 </div>
             </a>
 
-            <a href="/vulnerabilities?severity=LOW&groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?severity=LOW&groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card low">
                     <div class="card-icon">🟢</div>
                     <div class="card-content">
@@ -76,7 +91,7 @@
                 </div>
             </a>
 
-            <a href="/vulnerabilities?fixAvailable=YES&groupByCVE=true" class="summary-card-link">
+            <a href="/vulnerabilities?fixAvailable=YES&groupByCVE=true<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>" class="summary-card-link">
                 <div class="summary-card fixable">
                     <div class="card-icon">✅</div>
                     <div class="card-content">
@@ -91,13 +106,13 @@
         <div class="dashboard-section">
             <h3>Quick Actions</h3>
             <div class="action-buttons">
-                <button class="btn btn-primary" onclick="location.href='/vulnerabilities?severity=CRITICAL'">
+                <button class="btn btn-primary" onclick="location.href='/vulnerabilities?severity=CRITICAL<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>'">
                     View Critical Vulnerabilities
                 </button>
-                <button class="btn btn-success" onclick="location.href='/vulnerabilities?fixAvailable=YES'">
+                <button class="btn btn-success" onclick="location.href='/vulnerabilities?fixAvailable=YES<%= selectedAccountId ? '&awsAccountId=' + selectedAccountId : '' %>'">
                     View Fixable Issues
                 </button>
-                <button class="btn btn-info" onclick="location.href='/vulnerabilities'">
+                <button class="btn btn-info" onclick="location.href='/vulnerabilities<%= selectedAccountId ? '?awsAccountId=' + selectedAccountId : '' %>'">
                     View All Vulnerabilities
                 </button>
                 <button class="btn btn-secondary" onclick="location.href='/'">
@@ -151,6 +166,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/navigation.js"></script>
     <script>
         const summary = <%- JSON.stringify(summary) %>;
 
