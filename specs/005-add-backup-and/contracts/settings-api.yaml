@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: Vulnerability Dashboard Settings API
+  description: Database backup and clear operations for settings management
+  version: 1.0.0
+  contact:
+    name: Vulnerability Dashboard
+    email: steve.d.pennington@gmail.com
+
+servers:
+  - url: http://localhost:3010
+    description: Development server
+
+security:
+  - csrfToken: []
+
+paths:
+  /settings:
+    get:
+      tags: [Settings Page]
+      summary: Display settings page
+      description: Render the settings page with backup management interface
+      responses:
+        '200':
+          description: Settings page rendered successfully
+          content:
+            text/html:
+              schema:
+                type: string
+                description: Rendered HTML settings page
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backup:
+    post:
+      tags: [Backup Operations]
+      summary: Create database backup
+      description: Creates a complete backup of the vulnerability database
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum: [manual, pre_clear, scheduled]
+                  default: manual
+                  description: Reason for creating backup
+                _csrf:
+                  type: string
+                  description: CSRF protection token
+              required:
+                - _csrf
+            examples:
+              manual_backup:
+                summary: Manual user-initiated backup
+                value:
+                  reason: "manual"
+                  _csrf: "abc123def456"
+              pre_clear_backup:
+                summary: Automatic backup before clear operation
+                value:
+                  reason: "pre_clear"
+                  _csrf: "abc123def456"
+      responses:
+        '200':
+          description: Backup initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Backup already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                backup_in_progress:
+                  summary: Backup operation already running
+                  value:
+                    error: "Backup already in progress"
+                    code: "BACKUP_IN_PROGRESS"
+                    operationId: "op_1695044245123"
+        '500':
+          description: Backup creation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/clear:
+    post:
+      tags: [Clear Operations]
+      summary: Clear all vulnerability data
+      description: Removes all user data while preserving application settings. Automatically creates backup before clearing.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmationText:
+                  type: string
+                  enum: ["CLEAR ALL DATA"]
+                  description: User must type exact confirmation text
+                timestamp:
+                  type: integer
+                  description: Unix timestamp when confirmation was generated
+                _csrf:
+                  type: string
+                  description: CSRF protection token
+              required:
+                - confirmationText
+                - timestamp
+                - _csrf
+            examples:
+              clear_confirmation:
+                summary: Confirmed clear operation
+                value:
+                  confirmationText: "CLEAR ALL DATA"
+                  timestamp: 1695044245123
+                  _csrf: "abc123def456"
+      responses:
+        '200':
+          description: Clear operation completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearResponse'
+        '400':
+          description: Invalid confirmation or expired request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_confirmation:
+                  summary: Incorrect confirmation text
+                  value:
+                    error: "Invalid confirmation text. Must type exactly 'CLEAR ALL DATA'"
+                    code: "INVALID_CONFIRMATION"
+                expired_request:
+                  summary: Confirmation timestamp too old
+                  value:
+                    error: "Confirmation expired. Please try again."
+                    code: "CONFIRMATION_EXPIRED"
+        '500':
+          description: Clear operation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backups:
+    get:
+      tags: [Backup Operations]
+      summary: List available backups
+      description: Returns list of all available database backup files
+      responses:
+        '200':
+          description: Backup list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BackupMetadata'
+                  totalCount:
+                    type: integer
+                    description: Total number of backup files
+                  totalSize:
+                    type: integer
+                    description: Combined size of all backups in bytes
+        '500':
+          description: Failed to retrieve backup list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/status:
+    get:
+      tags: [Status Operations]
+      summary: Get operation status
+      description: Returns current status of any running backup or clear operations
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '500':
+          description: Failed to retrieve status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: CSRF protection token
+
+  schemas:
+    BackupMetadata:
+      type: object
+      properties:
+        backupId:
+          type: string
+          description: Unique backup identifier
+          example: "backup_2025-09-18_14-30-45"
+        fileName:
+          type: string
+          description: Backup file name
+          example: "vulnerability_db_backup_2025-09-18_14-30-45.db"
+        fileSize:
+          type: integer
+          description: Backup file size in bytes
+          example: 1048576
+        timestamp:
+          type: string
+          format: date-time
+          description: When backup was created
+          example: "2025-09-18T14:30:45.123Z"
+        reason:
+          type: string
+          enum: [manual, pre_clear, scheduled]
+          description: Reason backup was created
+          example: "manual"
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+          description: Backup operation status
+          example: "completed"
+        md5Hash:
+          type: string
+          description: File integrity checksum
+          example: "d41d8cd98f00b204e9800998ecf8427e"
+      required:
+        - backupId
+        - fileName
+        - fileSize
+        - timestamp
+        - reason
+        - status
+
+    BackupResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: "Backup initiated successfully"
+        operationId:
+          type: string
+          description: Operation tracking ID
+          example: "op_1695044245123"
+        backupId:
+          type: string
+          description: Backup identifier
+          example: "backup_2025-09-18_14-30-45"
+        estimatedDuration:
+          type: integer
+          description: Estimated completion time in milliseconds
+          example: 30000
+      required:
+        - message
+        - operationId
+        - backupId
+
+    ClearResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+          example: "All vulnerability data cleared successfully"
+        operationId:
+          type: string
+          description: Operation tracking ID
+          example: "op_1695044245123"
+        backup:
+          $ref: '#/components/schemas/BackupMetadata'
+        recordsCleared:
+          type: object
+          description: Count of records removed from each table
+          additionalProperties:
+            type: integer
+          example:
+            reports: 15
+            vulnerabilities: 247
+            resources: 89
+        duration:
+          type: integer
+          description: Operation duration in milliseconds
+          example: 2333
+      required:
+        - message
+        - operationId
+        - backup
+        - recordsCleared
+        - duration
+
+    StatusResponse:
+      type: object
+      properties:
+        hasActiveOperation:
+          type: boolean
+          description: Whether any operation is currently running
+          example: true
+        currentOperation:
+          type: object
+          nullable: true
+          properties:
+            operationId:
+              type: string
+              example: "op_1695044245123"
+            operationType:
+              type: string
+              enum: [backup, clear]
+              example: "backup"
+            progress:
+              type: object
+              properties:
+                percentComplete:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                  example: 45.5
+                stepDescription:
+                  type: string
+                  example: "Creating database backup"
+                estimatedTimeRemaining:
+                  type: integer
+                  description: Milliseconds remaining
+                  example: 15000
+      required:
+        - hasActiveOperation
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "Backup creation failed"
+        code:
+          type: string
+          description: Machine-readable error code
+          example: "BACKUP_FAILED"
+        details:
+          type: object
+          description: Additional error context
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+          description: When error occurred
+          example: "2025-09-18T14:30:45.123Z"
+      required:
+        - error
+        - code
+        - timestamp
+
+tags:
+  - name: Settings Page
+    description: Settings page rendering and navigation
+  - name: Backup Operations
+    description: Database backup creation and management
+  - name: Clear Operations
+    description: Database clearing and data management
+  - name: Status Operations
+    description: Operation status tracking and monitoring
