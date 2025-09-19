@@ -403,8 +403,8 @@ class PostgreSQLDatabaseService {
         }
 
         if (filters.resourceId) {
-            conditions.push(`v.resource_id = $${paramIndex++}`);
-            params.push(filters.resourceId);
+            conditions.push(`res.resource_id ILIKE $${paramIndex++}`);
+            params.push(`%${filters.resourceId}%`);
         }
 
         if (filters.search) {
