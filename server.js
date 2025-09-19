@@ -113,8 +113,8 @@ app.get('/vulnerabilities', async (req, res) => {
                 totalCount = await db.getVulnerabilitiesCount(filters);
                 totalPages = Math.ceil(totalCount / limit);
 
-                // Skip expensive packages/references queries for list view performance
-                vulnerabilities = await db.getVulnerabilities(filters, false, pagination);
+                // Include packages/references for detailed view when filters are applied
+                vulnerabilities = await db.getVulnerabilities(filters, true, pagination);
             }
         }
 
