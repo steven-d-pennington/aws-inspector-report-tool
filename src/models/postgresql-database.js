@@ -1049,6 +1049,211 @@ class PostgreSQLDatabaseService {
             }
         };
     }
+
+    // ===== Settings & Database Management =====
+
+    async getConnectionInfo() {
+        try {
+            const versionResult = await this.query('SELECT version()');
+            const connectionsResult = await this.query(`
+                SELECT count(*) as connection_count
+                FROM pg_stat_activity
+                WHERE state = 'active'
+            `);
+
+            return {
+                version: versionResult.rows[0]?.version || 'Unknown',
+                connectionCount: parseInt(connectionsResult.rows[0]?.connection_count || '0')
+            };
+        } catch (error) {
+            console.warn('Failed to get connection info:', error.message);
+            return {
+                version: 'Unknown',
+                connectionCount: 0
+            };
+        }
+    }
+
+    async getTableCounts() {
+        try {
+            // First check which tables exist
+            const existingTablesResult = await this.query(`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_type = 'BASE TABLE'
+            `);
+
+            const existingTables = existingTablesResult.rows.map(row => row.table_name);
+            const tables = ['reports', 'vulnerabilities', 'historical_data'];
+            const counts = {};
+
+            for (const table of tables) {
+                if (existingTables.includes(table)) {
+                    try {
+                        const result = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                        counts[table] = parseInt(result.rows[0]?.count || '0');
+                    } catch (error) {
+                        console.warn(`Failed to count ${table}:`, error.message);
+                        counts[table] = 0;
+                    }
+                } else {
+                    counts[table] = 0; // Table doesn't exist
+                }
+            }
+
+            return counts;
+        } catch (error) {
+            console.warn('Failed to get table counts:', error.message);
+            return {};
+        }
+    }
+
+    async clearDatabase() {
+        if (!this.pool) {
+            throw new Error('Database not initialized');
+        }
+
+        const results = {
+            recordsCleared: 0,
+            tablesCleared: [],
+            preservedTables: [],
+            errors: []
+        };
+
+        // First, check which tables actually exist
+        const existingTablesResult = await this.query(`
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE'
+        `);
+
+        const existingTables = existingTablesResult.rows.map(row => row.table_name);
+        console.log(`📋 Found existing tables: ${existingTables.join(', ')}`);
+
+        // Tables to clear (only if they exist)
+        const tablesToClear = [
+            'vulnerabilities',
+            'historical_data'
+        ].filter(table => existingTables.includes(table));
+
+        console.log(`🔄 Will clear tables: ${tablesToClear.join(', ')}`);
+
+        // Clear each table in its own transaction to avoid rollback issues
+        for (const table of tablesToClear) {
+            try {
+                await this.executeTransaction(async () => {
+                    // Get count before clearing
+                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                    const beforeCount = parseInt(countResult.rows[0]?.count || '0');
+
+                    // Clear the table
+                    await this.query(`DELETE FROM ${table}`);
+
+                    results.recordsCleared += beforeCount;
+                    results.tablesCleared.push(table);
+
+                    console.log(`✅ Cleared ${beforeCount} records from ${table}`);
+
+                    // Reset sequence for this table if it has one
+                    try {
+                        await this.query(`
+                            SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)
+                            WHERE pg_get_serial_sequence($1, 'id') IS NOT NULL
+                        `, [table]);
+                        console.log(`🔄 Reset sequence for ${table}`);
+                    } catch (seqError) {
+                        // Not all tables have sequences, so this is non-critical
+                        console.log(`ℹ️ No sequence to reset for ${table}`);
+                    }
+                });
+            } catch (error) {
+                console.error(`❌ Failed to clear ${table}:`, error.message);
+                results.errors.push({
+                    table: table,
+                    error: error.message
+                });
+            }
+        }
+
+        // Check reports table (preserve it)
+        if (existingTables.includes('reports')) {
+            try {
+                const reportCountResult = await this.query(`SELECT COUNT(*) as count FROM reports`);
+                const reportCount = parseInt(reportCountResult.rows[0]?.count || '0');
+
+                results.preservedTables.push({
+                    table: 'reports',
+                    recordCount: reportCount,
+                    reason: 'Report metadata preserved for audit trail'
+                });
+                console.log(`📊 Preserved ${reportCount} records in reports table`);
+            } catch (error) {
+                console.warn('Failed to check reports table:', error.message);
+            }
+        }
+
+        return results;
+    }
+
+    async clearAllData() {
+        if (!this.pool) {
+            throw new Error('Database not initialized');
+        }
+
+        return await this.executeTransaction(async () => {
+            const results = {
+                recordsCleared: 0,
+                tablesCleared: [],
+                preservedTables: [],
+                errors: []
+            };
+
+            // Clear ALL data tables (more aggressive than clearDatabase)
+            const tablesToClear = [
+                'vulnerabilities',
+                'historical_data',
+                'reports'
+            ];
+
+            for (const table of tablesToClear) {
+                try {
+                    // Get count before clearing
+                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                    const beforeCount = parseInt(countResult.rows[0]?.count || '0');
+
+                    // Clear the table
+                    await this.query(`DELETE FROM ${table}`);
+
+                    results.recordsCleared += beforeCount;
+                    results.tablesCleared.push(table);
+
+                    console.log(`✅ Cleared ${beforeCount} records from ${table}`);
+                } catch (error) {
+                    console.error(`❌ Failed to clear ${table}:`, error.message);
+                    results.errors.push({
+                        table: table,
+                        error: error.message
+                    });
+                }
+            }
+
+            // Reset all sequences
+            for (const table of results.tablesCleared) {
+                try {
+                    await this.query(`
+                        SELECT setval(pg_get_serial_sequence('${table}', 'id'), 1, false)
+                        WHERE pg_get_serial_sequence('${table}', 'id') IS NOT NULL
+                    `);
+                } catch (error) {
+                    console.warn(`Warning: Could not reset sequence for ${table}:`, error.message);
+                }
+            }
+
+            return results;
+        });
+    }
 }
 
 module.exports = { PostgreSQLDatabaseService };

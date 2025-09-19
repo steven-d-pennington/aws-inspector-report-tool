@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerability Dashboard - Settings</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>AWS Inspector Vulnerability Dashboard</h1>
+            <div class="nav-content">
+                <ul class="nav-links">
+                    <li><a href="/">Upload</a></li>
+                    <li><a href="/dashboard">Dashboard</a></li>
+                    <li><a href="/vulnerabilities">Vulnerabilities</a></li>
+                    <li><a href="/fixed-vulnerabilities">Fixed Vulnerabilities</a></li>
+                    <li><a href="/settings" class="active">Settings</a></li>
+                </ul>
+                <div class="nav-filter">
+                    <span class="admin-indicator">🔧 Admin</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h2>Settings</h2>
+            <p class="page-description">
+                Manage database operations and system settings.
+                <strong>Admin access required.</strong> These operations can affect the entire application.
+            </p>
+        </div>
+
+        <!-- Database Management Section -->
+        <div class="settings-section">
+            <h3>Database Management</h3>
+
+            <!-- Database Backup -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <div class="card-icon">💾</div>
+                    <div class="card-title">
+                        <h4>Database Backup</h4>
+                        <p>Create a compressed backup of the entire database</p>
+                    </div>
+                </div>
+
+                <div class="card-content">
+                    <p>Generate a downloadable backup file (.sql.gz) containing all vulnerability data, reports, and settings.</p>
+
+                    <div class="backup-info">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Status:</span>
+                                <span class="backup-status" id="backupStatus">Ready</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Last Backup:</span>
+                                <span id="lastBackupTime">Never</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Section -->
+                    <div class="progress-section" id="backupProgress" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-label">Creating backup...</span>
+                            <span class="progress-percentage" id="backupPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="backupProgressBar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-details" id="backupDetails"></div>
+                    </div>
+
+                    <!-- Download Section -->
+                    <div class="download-section" id="downloadSection" style="display: none;">
+                        <div class="download-info">
+                            <span class="download-icon">✅</span>
+                            <span class="download-message">Backup created successfully!</span>
+                        </div>
+                        <button class="btn btn-success" id="downloadBtn" onclick="downloadBackup()">
+                            📥 Download Backup
+                        </button>
+                    </div>
+
+                    <div class="card-actions">
+                        <button class="btn btn-primary" id="createBackupBtn" onclick="createBackup()">
+                            Create Backup
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Clear -->
+            <div class="settings-card danger-card">
+                <div class="card-header">
+                    <div class="card-icon">🗑️</div>
+                    <div class="card-title">
+                        <h4>Clear Database</h4>
+                        <p>Remove all vulnerability data (keeps settings and configuration)</p>
+                    </div>
+                </div>
+
+                <div class="card-content">
+                    <div class="warning-message">
+                        <div class="warning-icon">⚠️</div>
+                        <div class="warning-text">
+                            <strong>Danger Zone:</strong> This action will permanently delete all vulnerability reports and findings.
+                            System settings and configuration will be preserved. This action cannot be undone.
+                        </div>
+                    </div>
+
+                    <div class="clear-info">
+                        <h5>What will be deleted:</h5>
+                        <ul>
+                            <li>All vulnerability reports</li>
+                            <li>All vulnerability findings and data</li>
+                            <li>Upload history</li>
+                        </ul>
+
+                        <h5>What will be preserved:</h5>
+                        <ul>
+                            <li>Database schema and structure</li>
+                            <li>System settings and configuration</li>
+                            <li>User preferences</li>
+                        </ul>
+                    </div>
+
+                    <!-- Progress Section for Clear Operation -->
+                    <div class="progress-section" id="clearProgress" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-label">Clearing database...</span>
+                            <span class="progress-percentage" id="clearPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar danger-progress" id="clearProgressBar" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-details" id="clearDetails"></div>
+                    </div>
+
+                    <!-- Success Section -->
+                    <div class="success-section" id="clearSuccess" style="display: none;">
+                        <div class="success-info">
+                            <span class="success-icon">✅</span>
+                            <span class="success-message">Database cleared successfully!</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="location.href='/dashboard'">
+                            Go to Dashboard
+                        </button>
+                    </div>
+
+                    <div class="card-actions">
+                        <button class="btn btn-danger" id="clearDatabaseBtn" onclick="showClearConfirmation()">
+                            Clear Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Information Section -->
+        <div class="settings-section">
+            <h3>System Information</h3>
+
+            <div class="settings-card">
+                <div class="card-content">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Database Type:</span>
+                            <span>SQLite3</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Application Version:</span>
+                            <span>1.0.0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Node.js Version:</span>
+                            <span id="nodeVersion">Loading...</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Uptime:</span>
+                            <span id="systemUptime">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Confirmation Modal -->
+    <div id="clearConfirmationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ Confirm Database Clear</h3>
+                <button class="modal-close" onclick="hideClearConfirmation()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirmation-steps">
+                    <div class="confirmation-step active" id="step1">
+                        <h4>Step 1: Understand the Risk</h4>
+                        <p>This action will permanently delete:</p>
+                        <ul>
+                            <li>All vulnerability reports and data</li>
+                            <li>All upload history</li>
+                            <li>All vulnerability findings</li>
+                        </ul>
+                        <p><strong>This action cannot be undone.</strong></p>
+
+                        <div class="step-actions">
+                            <label class="confirmation-checkbox">
+                                <input type="checkbox" id="understandRisk" onchange="validateStep1()">
+                                I understand this action cannot be undone
+                            </label>
+                            <button class="btn btn-primary" id="step1NextBtn" onclick="goToStep2()" disabled>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="confirmation-step" id="step2">
+                        <h4>Step 2: Type Confirmation</h4>
+                        <p>To confirm, type <strong>CONFIRM</strong> in the box below:</p>
+
+                        <div class="confirmation-input-group">
+                            <input
+                                type="text"
+                                id="confirmationText"
+                                placeholder="Type CONFIRM here"
+                                onkeyup="validateStep2()"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <div class="input-validation" id="confirmationValidation"></div>
+                        </div>
+
+                        <div class="step-actions">
+                            <button class="btn btn-secondary" onclick="goToStep1()">
+                                Back
+                            </button>
+                            <button class="btn btn-danger" id="confirmClearBtn" onclick="performClear()" disabled>
+                                Clear Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>❌ Error</h3>
+                <button class="modal-close" onclick="hideErrorModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="error-content">
+                    <p id="errorMessage">An error occurred.</p>
+                    <div class="error-details" id="errorDetails" style="display: none;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hideErrorModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/navigation.js"></script>
+    <script src="/js/settings.js"></script>
+</body>
+</html>

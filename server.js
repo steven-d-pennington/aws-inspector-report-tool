@@ -4,10 +4,13 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const Database = require('./src/models/database');
 const reportService = require('./src/services/reportService');
 const exportService = require('./src/services/exportService');
 const HistoryService = require('./src/services/historyService');
+const SettingsService = require('./src/services/settingsService');
 
 const app = express();
 const PORT = 3010;
@@ -38,6 +41,30 @@ const upload = multer({
 
 // Initialize database
 const db = new Database();
+
+// Initialize settings service
+let settingsService;
+(async () => {
+    await db.initialize();
+    settingsService = new SettingsService(db);
+})();
+
+// pg_dump dependency validation
+const execFileAsync = promisify(execFile);
+
+async function validatePgDumpAvailability() {
+    try {
+        await execFileAsync('pg_dump', ['--version']);
+        console.log('✅ pg_dump is available');
+        return true;
+    } catch (error) {
+        console.warn('⚠️ pg_dump not found in PATH. Database backup functionality will be limited.');
+        return false;
+    }
+}
+
+// Validate pg_dump on startup
+validatePgDumpAvailability();
 
 // Routes
 app.get('/', async (req, res) => {
@@ -601,6 +628,206 @@ app.get('/api/health', async (req, res) => {
             message: error.message,
             timestamp: new Date().toISOString()
         });
+    }
+});
+
+// Admin Authentication Middleware
+function requireAdmin(req, res, next) {
+    if (process.env.ADMIN_ENABLED !== 'true') {
+        return res.status(403).json({
+            error: 'Admin functionality is disabled',
+            code: 'ADMIN_DISABLED'
+        });
+    }
+
+    // Additional admin validation can be added here
+    // For now, we rely on the environment variable
+    next();
+}
+
+// Settings Routes
+app.get('/settings', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const systemInfo = await settingsService.getSystemInfo();
+        const backups = await settingsService.listBackups();
+        const activeOperations = settingsService.getActiveOperations();
+
+        res.render('settings', {
+            systemInfo,
+            backups: backups.slice(0, 10), // Show latest 10 backups
+            activeOperations,
+            title: 'Settings - Database Management'
+        });
+    } catch (error) {
+        console.error('Settings page error:', error);
+        res.status(500).render('error', {
+            message: 'Failed to load settings page',
+            error: error.message
+        });
+    }
+});
+
+// System Information API
+app.get('/api/settings/system-info', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const systemInfo = await settingsService.getSystemInfo();
+        res.json(systemInfo);
+    } catch (error) {
+        console.error('System info error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Backup Operations
+app.post('/api/settings/backup', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const operation = await settingsService.createBackup();
+        res.json({
+            operationId: operation.id,
+            status: operation.status
+        });
+    } catch (error) {
+        console.error('Backup creation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/settings/backup/status/:id', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const operation = settingsService.getOperation(req.params.id);
+        const response = {
+            status: operation.status,
+            progress: operation.progress
+        };
+
+        if (operation.status === 'completed' && operation.metadata.downloadUrl) {
+            response.downloadUrl = operation.metadata.downloadUrl;
+        }
+
+        if (operation.status === 'failed') {
+            response.error = operation.errorMessage;
+        }
+
+        res.json(response);
+    } catch (error) {
+        console.error('Backup status error:', error);
+        res.status(404).json({ error: 'Operation not found' });
+    }
+});
+
+app.get('/api/settings/backup/download/:filename', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const filename = req.params.filename;
+        const backupFile = await settingsService.getBackupFile(filename);
+
+        if (!backupFile || !await backupFile.exists()) {
+            return res.status(404).json({ error: 'Backup file not found' });
+        }
+
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Length', backupFile.size);
+
+        const stream = require('fs').createReadStream(backupFile.path);
+        stream.pipe(res);
+
+        stream.on('error', (error) => {
+            console.error('Download stream error:', error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Download failed' });
+            }
+        });
+    } catch (error) {
+        console.error('Backup download error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/settings/backup/list', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const backups = await settingsService.listBackups();
+        res.json(backups.map(backup => backup.toJSON()));
+    } catch (error) {
+        console.error('Backup list error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Database Clear Operations
+app.post('/api/settings/clear', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        // Validate confirmation text
+        const { confirmationText } = req.body;
+        if (confirmationText !== 'CONFIRM') {
+            return res.status(400).json({
+                error: 'Invalid confirmation text. Must be exactly "CONFIRM"',
+                code: 'INVALID_CONFIRMATION'
+            });
+        }
+
+        const operation = await settingsService.clearDatabase();
+        res.json({
+            operationId: operation.id,
+            status: operation.status
+        });
+    } catch (error) {
+        console.error('Database clear error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/settings/clear/status/:id', requireAdmin, async (req, res) => {
+    try {
+        if (!settingsService) {
+            return res.status(503).json({ error: 'Settings service not initialized' });
+        }
+
+        const operation = settingsService.getOperation(req.params.id);
+        const response = {
+            status: operation.status,
+            progress: operation.progress
+        };
+
+        if (operation.status === 'completed' && operation.metadata.recordsCleared !== undefined) {
+            response.recordsCleared = operation.metadata.recordsCleared;
+        }
+
+        if (operation.status === 'failed') {
+            response.error = operation.errorMessage;
+        }
+
+        res.json(response);
+    } catch (error) {
+        console.error('Clear status error:', error);
+        res.status(404).json({ error: 'Operation not found' });
     }
 });
 

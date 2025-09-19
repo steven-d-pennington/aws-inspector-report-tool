@@ -545,6 +545,46 @@ class Database {
         }
         throw new Error('Get method not supported');
     }
+
+    // Settings & Database Management Methods
+    async getConnectionInfo() {
+        if (this.service.getConnectionInfo) {
+            return await this.service.getConnectionInfo();
+        }
+        return {
+            version: 'Unknown',
+            connectionCount: 0
+        };
+    }
+
+    async getTableCounts() {
+        if (this.service.getTableCounts) {
+            return await this.service.getTableCounts();
+        }
+        return {};
+    }
+
+    async clearDatabase() {
+        if (this.service.clearDatabase) {
+            return await this.service.clearDatabase();
+        }
+        throw new Error('Clear database method not supported');
+    }
+
+    async clearAllData() {
+        if (this.service.clearAllData) {
+            return await this.service.clearAllData();
+        }
+        throw new Error('Clear all data method not supported');
+    }
+
+    // Query method for direct database access (used by SettingsService)
+    async query(text, params = []) {
+        if (this.service.query) {
+            return await this.service.query(text, params);
+        }
+        throw new Error('Direct query method not supported');
+    }
 }
 
 module.exports = Database;

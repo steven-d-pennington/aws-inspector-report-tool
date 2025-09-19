@@ -16,6 +16,9 @@
                     <li><a href="/dashboard">Dashboard</a></li>
                     <li><a href="/vulnerabilities">Vulnerabilities</a></li>
                     <li><a href="/fixed-vulnerabilities" class="active">Fixed Vulnerabilities</a></li>
+                    <% if (process.env.ADMIN_ENABLED === 'true') { %>
+                    <li><a href="/settings">Settings</a></li>
+                    <% } %>
                 </ul>
                 <div class="nav-filter">
                     <label for="accountFilter">AWS Account:</label>

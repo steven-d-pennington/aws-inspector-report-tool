@@ -1,0 +1,26 @@
+{
+  "watch": [
+    "server.js",
+    "src/",
+    "public/",
+    "views/",
+    "routes/"
+  ],
+  "ignore": [
+    "uploads/",
+    "backups/",
+    "temp/",
+    "*.log",
+    "*.tmp",
+    "node_modules/",
+    ".git/",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3"
+  ],
+  "ext": "js,json,ejs,css,html",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000
+}
