@@ -1,0 +1,378 @@
+openapi: 3.0.3
+info:
+  title: Settings API
+  description: Database management settings API for vulnerability dashboard
+  version: 1.0.0
+servers:
+  - url: http://localhost:3010
+    description: Development server
+
+paths:
+  /settings:
+    get:
+      tags:
+        - Settings UI
+      summary: Render settings page
+      description: Display admin settings page with database management controls
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: Settings page HTML
+          content:
+            text/html:
+              schema:
+                type: string
+        '403':
+          description: Access denied - admin privileges required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backup:
+    post:
+      tags:
+        - Database Operations
+      summary: Create database backup
+      description: Initiate a full database backup operation
+      security:
+        - AdminAuth: []
+      responses:
+        '202':
+          description: Backup operation initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '403':
+          description: Access denied - admin privileges required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Another backup operation in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backup/status/{operationId}:
+    get:
+      tags:
+        - Database Operations
+      summary: Check backup operation status
+      description: Get current status and progress of backup operation
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupStatusResponse'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backup/download/{filename}:
+    get:
+      tags:
+        - Database Operations
+      summary: Download backup file
+      description: Download completed backup file
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.sql\.gz$'
+      responses:
+        '200':
+          description: Backup file
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="backup_2025-09-19_14-30-45.sql.gz"'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/backup/list:
+    get:
+      tags:
+        - Database Operations
+      summary: List available backups
+      description: Get list of available backup files
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: List of backup files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupListResponse'
+
+  /api/settings/clear:
+    post:
+      tags:
+        - Database Operations
+      summary: Clear database
+      description: Clear all vulnerability data while preserving settings
+      security:
+        - AdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClearRequest'
+      responses:
+        '202':
+          description: Clear operation initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationResponse'
+        '400':
+          description: Invalid confirmation text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied - admin privileges required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Another operation in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/settings/clear/status/{operationId}:
+    get:
+      tags:
+        - Database Operations
+      summary: Check clear operation status
+      description: Get current status and progress of clear operation
+      security:
+        - AdminAuth: []
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Operation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearStatusResponse'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+      description: Admin authentication token
+
+  schemas:
+    OperationResponse:
+      type: object
+      required:
+        - operationId
+        - status
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending]
+        message:
+          type: string
+
+    BackupStatusResponse:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - progress
+        - startTime
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [backup]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        downloadUrl:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            filename:
+              type: string
+            filepath:
+              type: string
+            fileSize:
+              type: integer
+
+    ClearStatusResponse:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - progress
+        - startTime
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [clear]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            tablesCleared:
+              type: array
+              items:
+                type: string
+            recordsDeleted:
+              type: object
+              additionalProperties:
+                type: integer
+            settingsPreserved:
+              type: integer
+
+    BackupListResponse:
+      type: object
+      required:
+        - backups
+        - totalSize
+        - count
+      properties:
+        backups:
+          type: array
+          items:
+            type: object
+            required:
+              - filename
+              - size
+              - created
+              - downloadUrl
+            properties:
+              filename:
+                type: string
+              size:
+                type: integer
+              created:
+                type: string
+                format: date-time
+              downloadUrl:
+                type: string
+        totalSize:
+          type: integer
+        count:
+          type: integer
+
+    ClearRequest:
+      type: object
+      required:
+        - confirmationText
+      properties:
+        confirmationText:
+          type: string
+          pattern: '^CONFIRM$'
+        preserveSettings:
+          type: boolean
+          default: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+        code:
+          type: string
