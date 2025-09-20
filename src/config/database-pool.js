@@ -3,59 +3,193 @@
  * Provides connection pooling, health checks, and transaction support
  */
 
+const path = require('path');
+const dotenv = require('dotenv');
 const { Pool } = require('pg');
+
+// Ensure environment variables from the project root .env file are loaded
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+function parseBoolean(value, fallback = false) {
+    if (value === undefined || value === null) {
+        return fallback;
+    }
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+        return true;
+    }
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+        return false;
+    }
+    return fallback;
+}
+
+function parseInteger(value, fallback) {
+    if (value === undefined || value === null || value === '') {
+        return fallback;
+    }
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function parseDatabaseUrl(url) {
+    if (!url) {
+        return {};
+    }
+
+    try {
+        const parsed = new URL(url);
+        const result = {
+            host: parsed.hostname || undefined,
+            port: parsed.port ? parseInteger(parsed.port, undefined) : undefined,
+            user: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+            password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+            database: parsed.pathname ? parsed.pathname.replace(/^\//, '') : undefined
+        };
+
+        const sslParam = parsed.searchParams.get('ssl');
+        const sslMode = parsed.searchParams.get('sslmode');
+        if (sslParam !== null) {
+            result.ssl = parseBoolean(sslParam, undefined);
+        } else if (sslMode) {
+            const normalized = sslMode.toLowerCase();
+            if (['require', 'verify-ca', 'verify-full'].includes(normalized)) {
+                result.ssl = true;
+            } else if (['disable', 'allow', 'prefer'].includes(normalized)) {
+                result.ssl = false;
+            }
+        }
+
+        return result;
+    } catch (error) {
+        console.warn('[db] DATABASE_URL parse error:', error.message);
+        return {};
+    }
+}
 
 class DatabasePool {
     constructor() {
         this.pool = null;
+        this.poolConfig = null;
+        this.connectionInfo = null;
         this.isConnected = false;
         this.connectionRetries = 0;
         this.maxRetries = 5;
         this.retryDelay = 2000; // 2 seconds
     }
 
+    buildConfig() {
+        const connectionString =
+            process.env.DATABASE_URL ||
+            process.env.DB_URL ||
+            process.env.PG_URL ||
+            process.env.PG_CONNECTION_STRING ||
+            process.env.POSTGRES_CONNECTION_STRING;
+
+        const parsedUrlConfig = parseDatabaseUrl(connectionString);
+
+        const host =
+            process.env.POSTGRES_HOST ||
+            process.env.DB_HOST ||
+            parsedUrlConfig.host ||
+            'localhost';
+        const port = parseInteger(
+            process.env.POSTGRES_PORT || process.env.DB_PORT,
+            parsedUrlConfig.port ?? 5432
+        );
+        const user =
+            process.env.POSTGRES_USER ||
+            process.env.DB_USER ||
+            parsedUrlConfig.user ||
+            'report_gen';
+        const password =
+            process.env.POSTGRES_PASSWORD ||
+            process.env.DB_PASSWORD ||
+            parsedUrlConfig.password ||
+            'StarDust';
+        const database =
+            process.env.POSTGRES_DB ||
+            process.env.DB_NAME ||
+            parsedUrlConfig.database ||
+            'vulnerability_reports';
+
+        const sslEnv =
+            process.env.DB_SSL !== undefined
+                ? parseBoolean(process.env.DB_SSL, false)
+                : process.env.PGSSL !== undefined
+                    ? parseBoolean(process.env.PGSSL, false)
+                    : parsedUrlConfig.ssl;
+
+        const poolConfig = {
+            host,
+            port,
+            database,
+            user,
+            password,
+            max: parseInteger(process.env.DB_POOL_MAX, 20),
+            idleTimeoutMillis: parseInteger(process.env.DB_POOL_IDLE_TIMEOUT, 30000),
+            connectionTimeoutMillis: parseInteger(process.env.DB_POOL_CONNECTION_TIMEOUT, 2000),
+            keepAlive: true,
+            keepAliveInitialDelayMillis: parseInteger(process.env.DB_POOL_KEEPALIVE_DELAY, 10000)
+        };
+
+        if (sslEnv !== undefined) {
+            poolConfig.ssl = sslEnv;
+        }
+
+        const applicationName = process.env.DB_APP_NAME || process.env.PGAPPNAME;
+        if (applicationName) {
+            poolConfig.application_name = applicationName;
+        }
+
+        if (connectionString) {
+            poolConfig.connectionString = connectionString;
+        }
+
+        const connectionInfo = {
+            host,
+            port,
+            database,
+            user,
+            ssl: poolConfig.ssl === true || (poolConfig.ssl && poolConfig.ssl.ssl === true)
+        };
+
+        return { poolConfig, connectionInfo };
+    }
+
     /**
      * Initialize connection pool with configuration from environment
      */
     async initialize() {
-        const config = {
-            host: 'localhost',
-            port: 5432,
-            database: 'vulnerability_reports',
-            user: 'report_gen',
-            password: 'StarDust',
-            max: parseInt(process.env.DB_POOL_MAX) || 20,
-            idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
-            connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT) || 2000,
-            // Additional PostgreSQL-specific optimizations
-            keepAlive: true,
-            keepAliveInitialDelayMillis: 10000,
-            ssl: false // Set to true for production with SSL
-        };
+        const { poolConfig, connectionInfo } = this.buildConfig();
+        this.poolConfig = poolConfig;
+        this.connectionInfo = connectionInfo;
 
-        console.log('🔄 Initializing PostgreSQL connection pool...');
-        console.log(`📊 Pool config: max=${config.max}, idle=${config.idleTimeoutMillis}ms, timeout=${config.connectionTimeoutMillis}ms`);
+        console.log('[db] Initializing PostgreSQL connection pool...');
+        console.log(
+            `[db] Host=${connectionInfo.host} Port=${connectionInfo.port} Database=${connectionInfo.database} User=${connectionInfo.user} SSL=${connectionInfo.ssl}`
+        );
 
-        this.pool = new Pool(config);
+        this.pool = new Pool(this.poolConfig);
 
         // Set up event handlers
-        this.pool.on('connect', (client) => {
-            console.log('🔗 New PostgreSQL client connected');
+        this.pool.on('connect', () => {
+            console.log('[db] New PostgreSQL client connected');
         });
 
-        this.pool.on('error', (err, client) => {
-            console.error('💥 PostgreSQL pool error:', err);
+        this.pool.on('error', (err) => {
+            console.error('[db] PostgreSQL pool error:', err);
             this.isConnected = false;
         });
 
-        this.pool.on('remove', (client) => {
-            console.log('🗑️ PostgreSQL client removed from pool');
+        this.pool.on('remove', () => {
+            console.log('[db] PostgreSQL client removed from pool');
         });
 
         // Test initial connection
         await this.testConnection();
 
-        console.log('✅ PostgreSQL connection pool initialized successfully');
+        console.log('[db] PostgreSQL connection pool initialized successfully');
         return this;
     }
 
@@ -71,24 +205,29 @@ class DatabasePool {
             this.isConnected = true;
             this.connectionRetries = 0;
 
-            console.log('✅ Database connection test successful');
-            console.log(`🕐 Server time: ${result.rows[0].now}`);
-            console.log(`🔧 PostgreSQL version: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
+            console.log('[db] Database connection test successful');
+            console.log(`[db] Server time: ${result.rows[0].now}`);
+            console.log(`[db] PostgreSQL version: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`);
 
             return true;
         } catch (error) {
             this.isConnected = false;
             this.connectionRetries++;
 
-            console.error(`❌ Database connection test failed (attempt ${this.connectionRetries}/${this.maxRetries}):`, error.message);
+            console.error(
+                `[db] Database connection test failed (attempt ${this.connectionRetries}/${this.maxRetries}):`,
+                error.message
+            );
 
             if (this.connectionRetries < this.maxRetries) {
-                console.log(`⏳ Retrying in ${this.retryDelay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+                console.log(`[db] Retrying in ${this.retryDelay}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
                 return await this.testConnection();
-            } else {
-                throw new Error(`Failed to connect to PostgreSQL after ${this.maxRetries} attempts: ${error.message}`);
             }
+
+            throw new Error(
+                `Failed to connect to PostgreSQL after ${this.maxRetries} attempts: ${error.message}`
+            );
         }
     }
 
@@ -112,9 +251,8 @@ class DatabasePool {
             const result = await client.query(text, params);
             const duration = Date.now() - start;
 
-            // Log slow queries
             if (duration > 1000) {
-                console.warn(`🐌 Slow query detected (${duration}ms): ${text.substring(0, 100)}...`);
+                console.warn(`[db] Slow query detected (${duration}ms): ${text.substring(0, 100)}...`);
             }
 
             return result;
@@ -135,7 +273,7 @@ class DatabasePool {
             return result;
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error('🔄 Transaction rolled back due to error:', error.message);
+            console.error('[db] Transaction rolled back due to error:', error.message);
             throw error;
         } finally {
             client.release();
@@ -155,7 +293,9 @@ class DatabasePool {
             idleCount: this.pool.idleCount,
             waitingCount: this.pool.waitingCount,
             maxCount: this.pool.options.max,
-            isConnected: this.isConnected
+            isConnected: this.isConnected,
+            host: this.connectionInfo?.host,
+            database: this.connectionInfo?.database
         };
     }
 
@@ -169,13 +309,12 @@ class DatabasePool {
                 return { healthy: false, error: 'Pool not initialized' };
             }
 
-            // Quick query test
             const result = await this.query('SELECT 1 as health_check');
             const isHealthy = result.rows[0]?.health_check === 1;
 
             return {
                 healthy: isHealthy,
-                stats: stats,
+                stats,
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
@@ -192,10 +331,10 @@ class DatabasePool {
      */
     async close() {
         if (this.pool) {
-            console.log('🔄 Closing PostgreSQL connection pool...');
+            console.log('[db] Closing PostgreSQL connection pool...');
             await this.pool.end();
             this.isConnected = false;
-            console.log('✅ PostgreSQL connection pool closed');
+            console.log('[db] PostgreSQL connection pool closed');
         }
     }
 }
