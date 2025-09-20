@@ -18,7 +18,7 @@ A comprehensive web application for uploading, processing, and analyzing AWS Ins
 - **Export Options**:
   - PDF reports with professional formatting
   - Notion-compatible markdown text
-- **Data Management**: SQLite database for fast querying and persistence
+- **Data Management**: PostgreSQL database with connection pooling for reliable persistence
 
 ## Installation
 
@@ -77,7 +77,7 @@ npm start
 
 ## Database Schema
 
-The application uses SQLite with the following tables:
+The application uses PostgreSQL with the following tables:
 - `reports`: Metadata about uploaded reports
 - `vulnerabilities`: Core vulnerability information
 - `resources`: Affected AWS resources
@@ -90,7 +90,7 @@ The application uses SQLite with the following tables:
 vulnerability-dashboard/
 ├── server.js                 # Main Express server
 ├── package.json             # Dependencies
-├── db/                      # SQLite database storage
+├── migrations/              # Database migration scripts
 ├── uploads/                 # Temporary file uploads
 ├── views/                   # EJS templates
 │   ├── index.ejs           # Upload page
@@ -114,7 +114,7 @@ vulnerability-dashboard/
 ## Technologies Used
 
 - **Backend**: Node.js, Express.js
-- **Database**: SQLite3
+- **Database**: PostgreSQL
 - **Frontend**: EJS templates, Vanilla JavaScript
 - **PDF Generation**: Puppeteer
 - **Markdown**: Marked

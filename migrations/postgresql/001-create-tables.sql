@@ -1,4 +1,4 @@
--- PostgreSQL Schema for Vulnerability Dashboard (SQLite compatibility)
+-- PostgreSQL Schema for Vulnerability Dashboard
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 

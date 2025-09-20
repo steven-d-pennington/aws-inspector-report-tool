@@ -25,7 +25,7 @@ class SettingsService {
 
             return {
                 database: {
-                    type: process.env.DATABASE_TYPE || 'postgresql',
+                    type: 'postgresql',
                     version: dbInfo.version || 'Unknown',
                     connectionCount: dbInfo.connectionCount || 0
                 },
@@ -151,7 +151,16 @@ class SettingsService {
     }
 
     async createJavaScriptBackup() {
-        const tables = ['reports', 'vulnerabilities', 'historical_data'];
+        const tables = [
+            'reports',
+            'vulnerabilities',
+            'resources',
+            'packages',
+            'references',
+            'upload_events',
+            'vulnerability_history',
+            'resource_history'
+        ];
         const backupData = {
             metadata: {
                 timestamp: new Date().toISOString(),
@@ -162,6 +171,7 @@ class SettingsService {
         };
 
         for (const tableName of tables) {
+            const identifier = tableName === 'references' ? '"references"' : tableName;
             try {
                 console.log(`🔄 Backing up table: ${tableName}`);
 
@@ -174,7 +184,7 @@ class SettingsService {
                 `, [tableName]);
 
                 // Get table data
-                const dataResult = await this.database.query(`SELECT * FROM ${tableName}`);
+                const dataResult = await this.database.query(`SELECT * FROM ${identifier}`);
 
                 backupData.tables[tableName] = {
                     schema: schemaResult.rows,

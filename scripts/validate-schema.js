@@ -21,26 +21,29 @@ const EXPECTED_TABLES = [
 
 const EXPECTED_INDEXES = [
     'idx_reports_upload_date',
-    'idx_reports_status',
-    'idx_reports_filename',
+    'idx_reports_account',
     'idx_vulnerabilities_severity',
     'idx_vulnerabilities_status',
+    'idx_vulnerabilities_account',
     'idx_vulnerabilities_last_observed',
-    'idx_vulnerabilities_package_name',
-    'idx_vulnerabilities_cve_id',
-    'idx_vulnerabilities_report_id',
-    'idx_settings_key',
+    'idx_vulnerabilities_cve',
+    'idx_resources_type',
+    'idx_resources_platform',
+    'idx_resources_account',
+    'idx_references_url',
     'idx_settings_type',
-    'idx_settings_updated_at'
+    'idx_upload_events_upload_id',
+    'idx_upload_events_started_at'
 ];
 
 const EXPECTED_CONSTRAINTS = [
     'reports_filename_not_empty',
-    'vulnerabilities_title_not_empty',
-    'settings_key_not_empty',
-    'fk_vulnerabilities_report_id',
-    'fk_resources_vulnerability_id',
-    'fk_packages_vulnerability_id'
+    'vulnerabilities_severity_check',
+    'vulnerabilities_report_id_fkey',
+    'resources_vulnerability_id_fkey',
+    'packages_vulnerability_id_fkey',
+    '"references"_vulnerability_id_fkey',
+    'settings_key_key'
 ];
 
 async function validateSchema() {
@@ -83,7 +86,6 @@ async function validateSchema() {
             FROM pg_indexes
             WHERE schemaname = 'public'
                 AND indexname NOT LIKE '%_pkey'
-                AND indexname NOT LIKE 'sqlite_%'
             ORDER BY indexname
         `);
 
