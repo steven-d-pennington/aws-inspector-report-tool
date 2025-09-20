@@ -13,7 +13,7 @@ const HistoryService = require('./src/services/historyService');
 const SettingsService = require('./src/services/settingsService');
 
 const app = express();
-const PORT = 3010;
+const PORT = process.env.PORT || 3010;
 
 // Middleware
 app.use(express.json());

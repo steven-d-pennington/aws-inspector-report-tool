@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: inspector-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vulnerability_reports}
+      POSTGRES_USER: ${POSTGRES_USER:-report_gen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-StarDust}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations/postgresql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-report_gen} -d ${POSTGRES_DB:-vulnerability_reports}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: inspector-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3010}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-vulnerability_reports}
+      DB_USER: ${DB_USER:-report_gen}
+      DB_PASSWORD: ${DB_PASSWORD:-StarDust}
+    ports:
+      - "3010:3010"
+    volumes:
+      - uploads-data:/usr/src/app/uploads
+      - backups-data:/usr/src/app/backups
+
+volumes:
+  postgres-data:
+  uploads-data:
+  backups-data:

@@ -18,23 +18,49 @@ class DatabasePool {
      * Initialize connection pool with configuration from environment
      */
     async initialize() {
+        const parseBoolean = (value, defaultValue = false) => {
+            if (value === undefined || value === null) {
+                return defaultValue;
+            }
+
+            if (typeof value === 'boolean') {
+                return value;
+            }
+
+            return ['true', '1', 'yes', 'on'].includes(String(value).toLowerCase().trim());
+        };
+
+        const sslEnabled = parseBoolean(process.env.DB_SSL, false);
+        const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED;
+
         const config = {
-            host: 'localhost',
-            port: 5432,
-            database: 'vulnerability_reports',
-            user: 'report_gen',
-            password: 'StarDust',
-            max: parseInt(process.env.DB_POOL_MAX) || 20,
-            idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT) || 30000,
-            connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT) || 2000,
+            host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT, 10) || 5432,
+            database: process.env.DB_NAME || process.env.POSTGRES_DB || 'vulnerability_reports',
+            user: process.env.DB_USER || process.env.POSTGRES_USER || 'report_gen',
+            password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD || 'StarDust',
+            max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+            idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT, 10) || 30000,
+            connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT, 10) || 2000,
             // Additional PostgreSQL-specific optimizations
             keepAlive: true,
             keepAliveInitialDelayMillis: 10000,
-            ssl: false // Set to true for production with SSL
+            ssl: sslEnabled
+                ? (rejectUnauthorized !== undefined
+                    ? { rejectUnauthorized: parseBoolean(rejectUnauthorized, true) }
+                    : true)
+                : false
         };
 
         console.log('🔄 Initializing PostgreSQL connection pool...');
-        console.log(`📊 Pool config: max=${config.max}, idle=${config.idleTimeoutMillis}ms, timeout=${config.connectionTimeoutMillis}ms`);
+        const safeConfig = {
+            ...config,
+            password: config.password ? '***' : undefined,
+            ssl: config.ssl ? (typeof config.ssl === 'object' ? { ...config.ssl } : config.ssl) : false
+        };
+        console.log(
+            `📊 Pool config: host=${safeConfig.host}, port=${safeConfig.port}, db=${safeConfig.database}, user=${safeConfig.user}, max=${safeConfig.max}, idle=${safeConfig.idleTimeoutMillis}ms, timeout=${safeConfig.connectionTimeoutMillis}ms, ssl=${sslEnabled}`
+        );
 
         this.pool = new Pool(config);
 
