@@ -8,7 +8,7 @@ module.exports = {
     '!node_modules/**'
   ],
   testMatch: [
-    '<rootDir>/tests/**/*.js'
+    '<rootDir>/tests/**/*.test.js'
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   verbose: true,

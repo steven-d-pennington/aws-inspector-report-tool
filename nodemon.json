@@ -14,9 +14,7 @@
     "*.tmp",
     "node_modules/",
     ".git/",
-    "*.db",
-    "*.sqlite",
-    "*.sqlite3"
+    "*.db"
   ],
   "ext": "js,json,ejs,css,html",
   "env": {

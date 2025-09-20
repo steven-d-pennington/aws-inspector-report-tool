@@ -1,6 +1,6 @@
 /**
  * PostgreSQL Database Service Implementation
- * Provides a compatibility layer that matches the legacy SQLite interface
+ * Provides the concrete implementation for the database facade
  */
 
 const { randomUUID } = require('crypto');
@@ -817,12 +817,12 @@ class PostgreSQLDatabaseService {
             }
 
             if (filters.fixedAfter) {
-                conditions.push(`h.archived_at >= $${paramIndex++}::date`);
+                conditions.push(`h.archived_date >= $${paramIndex++}::date`);
                 params.push(filters.fixedAfter);
             }
 
             if (filters.fixedBefore) {
-                conditions.push(`h.archived_at <= $${paramIndex++}::date`);
+                conditions.push(`h.archived_date <= $${paramIndex++}::date`);
                 params.push(filters.fixedBefore);
             }
 
@@ -1085,13 +1085,23 @@ class PostgreSQLDatabaseService {
             `);
 
             const existingTables = existingTablesResult.rows.map(row => row.table_name);
-            const tables = ['reports', 'vulnerabilities', 'historical_data'];
+            const tables = [
+                'reports',
+                'vulnerabilities',
+                'resources',
+                'packages',
+                'references',
+                'upload_events',
+                'vulnerability_history',
+                'resource_history'
+            ];
             const counts = {};
 
             for (const table of tables) {
                 if (existingTables.includes(table)) {
+                    const identifier = table === 'references' ? '"references"' : table;
                     try {
-                        const result = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                        const result = await this.query(`SELECT COUNT(*) as count FROM ${identifier}`);
                         counts[table] = parseInt(result.rows[0]?.count || '0');
                     } catch (error) {
                         console.warn(`Failed to count ${table}:`, error.message);
@@ -1134,8 +1144,13 @@ class PostgreSQLDatabaseService {
 
         // Tables to clear (only if they exist)
         const tablesToClear = [
+            'references',
+            'packages',
+            'resources',
             'vulnerabilities',
-            'historical_data'
+            'upload_events',
+            'vulnerability_history',
+            'resource_history'
         ].filter(table => existingTables.includes(table));
 
         console.log(`🔄 Will clear tables: ${tablesToClear.join(', ')}`);
@@ -1145,11 +1160,12 @@ class PostgreSQLDatabaseService {
             try {
                 await this.executeTransaction(async () => {
                     // Get count before clearing
-                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                    const identifier = table === 'references' ? '"references"' : table;
+                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${identifier}`);
                     const beforeCount = parseInt(countResult.rows[0]?.count || '0');
 
                     // Clear the table
-                    await this.query(`DELETE FROM ${table}`);
+                    await this.query(`DELETE FROM ${identifier}`);
 
                     results.recordsCleared += beforeCount;
                     results.tablesCleared.push(table);
@@ -1158,10 +1174,11 @@ class PostgreSQLDatabaseService {
 
                     // Reset sequence for this table if it has one
                     try {
+                        const sequenceTarget = table === 'references' ? '"references"' : table;
                         await this.query(`
                             SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)
                             WHERE pg_get_serial_sequence($1, 'id') IS NOT NULL
-                        `, [table]);
+                        `, [sequenceTarget]);
                         console.log(`🔄 Reset sequence for ${table}`);
                     } catch (seqError) {
                         // Not all tables have sequences, so this is non-critical
@@ -1212,19 +1229,25 @@ class PostgreSQLDatabaseService {
 
             // Clear ALL data tables (more aggressive than clearDatabase)
             const tablesToClear = [
+                'references',
+                'packages',
+                'resources',
+                'upload_events',
+                'vulnerability_history',
+                'resource_history',
                 'vulnerabilities',
-                'historical_data',
                 'reports'
             ];
 
             for (const table of tablesToClear) {
                 try {
+                    const identifier = table === 'references' ? '"references"' : table;
                     // Get count before clearing
-                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${table}`);
+                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${identifier}`);
                     const beforeCount = parseInt(countResult.rows[0]?.count || '0');
 
                     // Clear the table
-                    await this.query(`DELETE FROM ${table}`);
+                    await this.query(`DELETE FROM ${identifier}`);
 
                     results.recordsCleared += beforeCount;
                     results.tablesCleared.push(table);
@@ -1242,10 +1265,11 @@ class PostgreSQLDatabaseService {
             // Reset all sequences
             for (const table of results.tablesCleared) {
                 try {
+                    const sequenceTarget = table === 'references' ? '"references"' : table;
                     await this.query(`
-                        SELECT setval(pg_get_serial_sequence('${table}', 'id'), 1, false)
-                        WHERE pg_get_serial_sequence('${table}', 'id') IS NOT NULL
-                    `);
+                        SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)
+                        WHERE pg_get_serial_sequence($1, 'id') IS NOT NULL
+                    `, [sequenceTarget]);
                 } catch (error) {
                     console.warn(`Warning: Could not reset sequence for ${table}:`, error.message);
                 }

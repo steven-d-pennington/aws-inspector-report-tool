@@ -4,7 +4,6 @@ const fs = require('fs').promises;
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.TEST_DATABASE_PATH = ':memory:'; // Use in-memory SQLite for tests
 
 // Global test utilities
 global.testUtils = {
