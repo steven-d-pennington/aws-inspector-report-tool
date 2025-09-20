@@ -1,0 +1,255 @@
+openapi: 3.0.0
+info:
+  title: Container Configuration API
+  version: 1.0.0
+  description: Configuration management endpoints for containerized application
+
+paths:
+  /api/config:
+    get:
+      summary: Get current configuration
+      description: Returns current container configuration (non-sensitive values only)
+      operationId: getConfiguration
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationResponse'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/config/validate:
+    post:
+      summary: Validate configuration
+      description: Validates configuration without applying it
+      operationId: validateConfiguration
+      tags:
+        - Configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationRequest'
+      responses:
+        '200':
+          description: Configuration is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+        '400':
+          description: Configuration is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+
+  /api/config/reload:
+    post:
+      summary: Reload configuration
+      description: Triggers configuration reload from environment
+      operationId: reloadConfiguration
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Configuration reloaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReloadResponse'
+        '500':
+          description: Reload failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ConfigurationResponse:
+      type: object
+      required:
+        - environment
+        - version
+        - timestamp
+      properties:
+        environment:
+          type: string
+          enum: [development, production, test]
+          description: Current environment
+        version:
+          type: string
+          description: Application version
+        timestamp:
+          type: string
+          format: date-time
+          description: Configuration read timestamp
+        application:
+          type: object
+          properties:
+            port:
+              type: integer
+              description: Application port
+            host:
+              type: string
+              description: Binding host
+            logLevel:
+              type: string
+              enum: [error, warn, info, debug]
+        database:
+          type: object
+          properties:
+            host:
+              type: string
+              description: Database host (masked)
+            port:
+              type: integer
+              description: Database port
+            name:
+              type: string
+              description: Database name
+            ssl:
+              type: boolean
+              description: SSL enabled
+            poolSize:
+              type: object
+              properties:
+                min:
+                  type: integer
+                max:
+                  type: integer
+        container:
+          type: object
+          properties:
+            hostname:
+              type: string
+              description: Container hostname
+            platform:
+              type: string
+              description: Container platform
+            memory:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  description: Memory limit in MB
+                used:
+                  type: integer
+                  description: Current memory usage in MB
+
+    ConfigurationRequest:
+      type: object
+      properties:
+        database:
+          type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+              minimum: 1
+              maximum: 65535
+            name:
+              type: string
+            poolMin:
+              type: integer
+              minimum: 1
+            poolMax:
+              type: integer
+              minimum: 1
+        application:
+          type: object
+          properties:
+            port:
+              type: integer
+              minimum: 1
+              maximum: 65535
+            logLevel:
+              type: string
+              enum: [error, warn, info, debug]
+
+    ValidationResponse:
+      type: object
+      required:
+        - valid
+        - timestamp
+      properties:
+        valid:
+          type: boolean
+          description: Whether configuration is valid
+        timestamp:
+          type: string
+          format: date-time
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Configuration field with error
+              message:
+                type: string
+                description: Error message
+              value:
+                description: Invalid value (if safe to expose)
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    ReloadResponse:
+      type: object
+      required:
+        - success
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          description: Whether reload was successful
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          description: List of configuration changes applied
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              oldValue:
+                type: string
+                description: Previous value (masked if sensitive)
+              newValue:
+                type: string
+                description: New value (masked if sensitive)
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Error message
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+          description: Additional error details

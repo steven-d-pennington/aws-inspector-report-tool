@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust  # Simplified auth for development
+    ports:
+      - "5432:5432"  # Expose database for external tools
+    volumes:
+      - ./backups:/backups  # Mount backups directory for easy access
+
+  app:
+    build:
+      target: development  # Use development stage
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      ENABLE_HOT_RELOAD: "true"
+      DEBUG_MODE: ${DEBUG_MODE:-false}
+      # Enable Node.js debugging
+      NODE_OPTIONS: "--inspect=0.0.0.0:9229"
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src:delegated
+      - ./public:/app/public:delegated
+      - ./views:/app/views:delegated
+      - ./server.js:/app/server.js:delegated
+      - ./package.json:/app/package.json:delegated
+      - ./package-lock.json:/app/package-lock.json:delegated
+      # Exclude node_modules to use container's version
+      - /app/node_modules
+      # Mount uploads and logs for easy access
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Node.js debugger port
+    command: ["npx", "nodemon", "--inspect=0.0.0.0:9229", "server.js"]
+    stdin_open: true
+    tty: true

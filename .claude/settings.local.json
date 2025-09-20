@@ -19,7 +19,8 @@
       "Bash(.specify/scripts/powershell/check-task-prerequisites.ps1 -Json)",
       "Bash(git add:*)",
       "Bash(npm test)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(.specify/scripts/powershell/create-new-feature.ps1:*)"
     ],
     "deny": [],
     "ask": []

@@ -12,8 +12,15 @@ const exportService = require('./src/services/exportService');
 const HistoryService = require('./src/services/historyService');
 const SettingsService = require('./src/services/settingsService');
 
+// Import environment configuration and new routes
+const environmentConfig = require('./src/config/environment');
+const healthRoutes = require('./src/routes/health');
+const configRoutes = require('./src/routes/config');
+
 const app = express();
-const PORT = 3010;
+const serverConfig = environmentConfig.getConfig('server');
+const PORT = serverConfig.port;
+const HOST = serverConfig.host;
 
 // Middleware
 app.use(express.json());
@@ -21,6 +28,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Register new Docker health and config routes
+app.use('/', healthRoutes);
+app.use('/api', configRoutes);
 
 // File upload configuration
 const storage = multer.diskStorage({
@@ -833,9 +844,40 @@ app.get('/api/settings/clear/status/:id', requireAdmin, async (req, res) => {
 
 // Initialize database and start server
 db.initialize().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Vulnerability Dashboard running on http://localhost:${PORT}`);
+    const server = app.listen(PORT, HOST, () => {
+        console.log(`Vulnerability Dashboard running on http://${HOST}:${PORT}`);
+        console.log(`Environment: ${serverConfig.env}`);
+        console.log(`Container mode: ${environmentConfig.isContainer()}`);
     });
+
+    // Graceful shutdown handling for Docker
+    const gracefulShutdown = async (signal) => {
+        console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+
+        server.close(async () => {
+            console.log('HTTP server closed.');
+
+            try {
+                await db.close();
+                console.log('Database connections closed.');
+                process.exit(0);
+            } catch (error) {
+                console.error('Error during database shutdown:', error);
+                process.exit(1);
+            }
+        });
+
+        // Force shutdown after 30 seconds
+        setTimeout(() => {
+            console.error('Could not close connections in time, forcefully shutting down');
+            process.exit(1);
+        }, 30000);
+    };
+
+    // Listen for shutdown signals
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 }).catch(err => {
     console.error('Failed to initialize database:', err);
     process.exit(1);

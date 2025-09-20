@@ -1,0 +1,154 @@
+openapi: 3.0.0
+info:
+  title: Container Health Check API
+  version: 1.0.0
+  description: Health check endpoints for containerized application
+
+paths:
+  /health:
+    get:
+      summary: Basic health check
+      description: Returns application health status for Docker HEALTHCHECK
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Application is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/ready:
+    get:
+      summary: Readiness check
+      description: Checks if application is ready to serve traffic
+      operationId: getReadiness
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Application is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          description: Application is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+
+  /health/live:
+    get:
+      summary: Liveness check
+      description: Checks if application is alive and should not be restarted
+      operationId: getLiveness
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Application is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessStatus'
+        '503':
+          description: Application needs restart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessStatus'
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          description: Overall health status
+        timestamp:
+          type: string
+          format: date-time
+          description: Check timestamp
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [connected, disconnected, error]
+            memory:
+              type: string
+              enum: [ok, warning, critical]
+            disk:
+              type: string
+              enum: [ok, warning, critical]
+
+    ReadinessStatus:
+      type: object
+      required:
+        - ready
+        - timestamp
+      properties:
+        ready:
+          type: boolean
+          description: Whether application is ready for traffic
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            database:
+              type: boolean
+              description: Database connection ready
+            migrations:
+              type: boolean
+              description: Database migrations complete
+            cache:
+              type: boolean
+              description: Cache warmed up
+        message:
+          type: string
+          description: Human-readable status message
+
+    LivenessStatus:
+      type: object
+      required:
+        - alive
+        - timestamp
+      properties:
+        alive:
+          type: boolean
+          description: Whether application is alive
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+          description: Application uptime in seconds
+        memory:
+          type: object
+          properties:
+            used:
+              type: number
+              description: Memory used in MB
+            limit:
+              type: number
+              description: Memory limit in MB
+            percentage:
+              type: number
+              description: Memory usage percentage
