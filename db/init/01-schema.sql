@@ -256,5 +256,5 @@ CREATE INDEX IF NOT EXISTS idx_resource_history_archived
     ON resource_history(archived_date DESC);
 
 -- Grant permissions to application user
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO appuser;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO appuser;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO postgres;

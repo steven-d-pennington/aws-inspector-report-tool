@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: ${POSTGRES_CONTAINER_NAME:-aws-inspector-db}
     environment:
-      POSTGRES_USER: ${DB_USER:-appuser}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-vulnerability_dashboard}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-vulnerability_reports}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -17,7 +15,7 @@ services:
     networks:
       - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-appuser} -d ${DB_NAME:-vulnerability_dashboard}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-vulnerability_reports}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,8 +35,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vulnerability_dashboard}
-      DB_USER: ${DB_USER:-appuser}
+      DB_NAME: ${DB_NAME:-vulnerability_reports}
+      DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL_MODE: ${DB_SSL_MODE:-prefer}
       DB_POOL_MIN: ${DB_POOL_MIN:-2}
