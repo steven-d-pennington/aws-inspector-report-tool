@@ -1,0 +1,264 @@
+{
+  "findings": [
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-06-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "HIGH severity vulnerability",
+      "title": "CVE-2024-0007 - Python Code Injection",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-04-01T10:30:00Z",
+      "updatedAt": "2024-04-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0007",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0007",
+        "vulnerablePackages": [
+          {
+            "name": "example-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.0.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-example123456789",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "example-server",
+            "Environment": "production"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update package to fix vulnerability."
+        }
+      },
+      "inspectorScore": 7.8,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.8,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-08-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "LOW severity vulnerability",
+      "title": "CVE-2024-0009 - Elasticsearch Information Disclosure",
+      "severity": "LOW",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-04-01T10:30:00Z",
+      "updatedAt": "2024-04-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0009",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0009",
+        "vulnerablePackages": [
+          {
+            "name": "example-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.0.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-example123456789",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "example-server",
+            "Environment": "production"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update package to fix vulnerability."
+        }
+      },
+      "inspectorScore": 3.7,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 3.7,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-04-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "HIGH severity vulnerability",
+      "title": "CVE-2024-0014 - Prometheus Metrics Exposure",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-04-01T10:30:00Z",
+      "updatedAt": "2024-04-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0014",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0014",
+        "vulnerablePackages": [
+          {
+            "name": "example-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.0.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-example123456789",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "example-server",
+            "Environment": "production"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update package to fix vulnerability."
+        }
+      },
+      "inspectorScore": 7.1,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.1,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-new-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "HIGH severity vulnerability",
+      "title": "CVE-2024-0018 - Linux Kernel Privilege Escalation",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-04-01T10:30:00Z",
+      "updatedAt": "2024-04-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0018",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0018",
+        "vulnerablePackages": [
+          {
+            "name": "example-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.0.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-example123456789",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "example-server",
+            "Environment": "production"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update package to fix vulnerability."
+        }
+      },
+      "inspectorScore": 7.4,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.4,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-new-004",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "CRITICAL severity vulnerability",
+      "title": "CVE-2024-0025 - Apache Struts RCE",
+      "severity": "CRITICAL",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-04-01T10:30:00Z",
+      "updatedAt": "2024-04-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0025",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0025",
+        "vulnerablePackages": [
+          {
+            "name": "example-package",
+            "version": "1.0.0",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.0.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-example123456789",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "example-server",
+            "Environment": "production"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update package to fix vulnerability."
+        }
+      },
+      "inspectorScore": 9.2,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 9.2,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,889 @@
+{
+  "findings": [
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-01-002",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in nginx web server",
+      "title": "CVE-2024-0002 - Nginx Request Smuggling",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0002",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0002",
+        "vulnerablePackages": [
+          {
+            "name": "nginx",
+            "version": "1.18.0",
+            "epoch": 0,
+            "release": "6.1ubuntu1.2",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.18.0-6.1ubuntu1.3"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-0a1b2c3d4e5f6g7h8",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "web-server-prod-01",
+            "Environment": "production",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update nginx to version 1.18.0-6.1ubuntu1.3 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 7.5,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.5,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-02-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Critical vulnerability in Apache HTTP Server",
+      "title": "CVE-2024-0003 - Apache HTTP Server Path Traversal",
+      "severity": "CRITICAL",
+      "firstObservedAt": "2024-01-01T09:15:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0003",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0003",
+        "vulnerablePackages": [
+          {
+            "name": "apache2",
+            "version": "2.4.41",
+            "epoch": 0,
+            "release": "4ubuntu3.13",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "2.4.41-4ubuntu3.14"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-1b2c3d4e5f6g7h8i9",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "web-server-prod-02",
+            "Environment": "production",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update apache2 to version 2.4.41-4ubuntu3.14 or later to fix this critical vulnerability."
+        }
+      },
+      "inspectorScore": 9.1,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 9.1,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-03-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in MySQL database server",
+      "title": "CVE-2024-0004 - MySQL SQL Injection",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T09:30:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0004",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0004",
+        "vulnerablePackages": [
+          {
+            "name": "mysql-server",
+            "version": "8.0.34",
+            "epoch": 0,
+            "release": "0ubuntu0.20.04.1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "8.0.35-0ubuntu0.20.04.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-2c3d4e5f6g7h8i9j0",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "database-server-01",
+            "Environment": "production",
+            "Team": "data"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update mysql-server to version 8.0.35-0ubuntu0.20.04.1 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 8.2,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 8.2,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-04-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Medium severity vulnerability in PostgreSQL database",
+      "title": "CVE-2024-0005 - PostgreSQL Authentication Bypass",
+      "severity": "MEDIUM",
+      "firstObservedAt": "2024-01-01T10:00:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0005",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0005",
+        "vulnerablePackages": [
+          {
+            "name": "postgresql",
+            "version": "12.16",
+            "epoch": 0,
+            "release": "1.pgdg20.04+1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "12.17-1.pgdg20.04+1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-3d4e5f6g7h8i9j0k1",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "database-server-02",
+            "Environment": "production",
+            "Team": "data"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update postgresql to version 12.17-1.pgdg20.04+1 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 5.8,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 5.8,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-06-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in Python interpreter",
+      "title": "CVE-2024-0007 - Python Code Injection",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T11:30:00Z",
+      "lastObservedAt": "2024-02-01T11:45:00Z",
+      "updatedAt": "2024-02-01T11:45:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0007",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0007",
+        "vulnerablePackages": [
+          {
+            "name": "python3.8",
+            "version": "3.8.10",
+            "epoch": 0,
+            "release": "0ubuntu1~20.04.8",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "3.8.10-0ubuntu1~20.04.9"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-5f6g7h8i9j0k1l2m3",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "ml-server-01",
+            "Environment": "production",
+            "Team": "ml"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update python3.8 to version 3.8.10-0ubuntu1~20.04.9 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 7.8,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.8,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-07-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Medium severity vulnerability in Redis cache server",
+      "title": "CVE-2024-0008 - Redis Memory Corruption",
+      "severity": "MEDIUM",
+      "firstObservedAt": "2024-01-01T12:00:00Z",
+      "lastObservedAt": "2024-02-01T12:15:00Z",
+      "updatedAt": "2024-02-01T12:15:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0008",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0008",
+        "vulnerablePackages": [
+          {
+            "name": "redis-server",
+            "version": "6.0.16",
+            "epoch": 0,
+            "release": "1ubuntu1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "6.0.17-1ubuntu1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-6g7h8i9j0k1l2m3n4",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "cache-server-01",
+            "Environment": "production",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update redis-server to version 6.0.17-1ubuntu1 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 6.1,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 6.1,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-08-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Low severity vulnerability in Elasticsearch",
+      "title": "CVE-2024-0009 - Elasticsearch Information Disclosure",
+      "severity": "LOW",
+      "firstObservedAt": "2024-01-01T12:30:00Z",
+      "lastObservedAt": "2024-02-01T12:45:00Z",
+      "updatedAt": "2024-02-01T12:45:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0009",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0009",
+        "vulnerablePackages": [
+          {
+            "name": "elasticsearch",
+            "version": "7.17.9",
+            "epoch": 0,
+            "release": "1",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "7.17.10-1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-7h8i9j0k1l2m3n4o5",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "search-server-01",
+            "Environment": "production",
+            "Team": "search"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update elasticsearch to version 7.17.10-1 or later to fix this vulnerability."
+        }
+      },
+      "inspectorScore": 3.7,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 3.7,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-09-001",
+      "awsAccountId": "123456789012",
+      "type": "NETWORK_REACHABILITY",
+      "description": "Network vulnerability allowing unauthorized access",
+      "title": "EC2-UnrestrictedSourceInSecurityGroup - Unrestricted SSH Access",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T13:00:00Z",
+      "lastObservedAt": "2024-02-01T13:15:00Z",
+      "updatedAt": "2024-02-01T13:15:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "resources": [
+        {
+          "id": "i-8i9j0k1l2m3n4o5p6",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "monitoring-server-01",
+            "Environment": "production",
+            "Team": "ops"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Restrict SSH access in security group to specific IP ranges instead of 0.0.0.0/0."
+        }
+      },
+      "inspectorScore": 7.2,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.2,
+          "scoreSource": "AWS",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-10-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Critical vulnerability in Docker runtime",
+      "title": "CVE-2024-0010 - Docker Escape Vulnerability",
+      "severity": "CRITICAL",
+      "firstObservedAt": "2024-01-01T13:30:00Z",
+      "lastObservedAt": "2024-02-01T13:45:00Z",
+      "updatedAt": "2024-02-01T13:45:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0010",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0010",
+        "vulnerablePackages": [
+          {
+            "name": "docker.io",
+            "version": "20.10.21",
+            "epoch": 0,
+            "release": "0ubuntu1~20.04.2",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "20.10.24-0ubuntu1~20.04.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-9j0k1l2m3n4o5p6q7",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "container-host-01",
+            "Environment": "production",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update docker.io to version 20.10.24-0ubuntu1~20.04.1 or later to fix this critical vulnerability."
+        }
+      },
+      "inspectorScore": 9.3,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 9.3,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-01-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Critical vulnerability in base container image",
+      "title": "CVE-2024-0011 - Ubuntu Base Image Vulnerability",
+      "severity": "CRITICAL",
+      "firstObservedAt": "2024-01-01T08:00:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0011",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0011",
+        "vulnerablePackages": [
+          {
+            "name": "libc6",
+            "version": "2.31-0ubuntu9.7",
+            "epoch": 0,
+            "release": "",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "2.31-0ubuntu9.8"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "123456789012.dkr.ecr.us-east-1.amazonaws.com/webapp-frontend:latest",
+          "type": "AWS_ECR_CONTAINER_IMAGE",
+          "tags": {
+            "Name": "webapp-frontend",
+            "Version": "1.0.0",
+            "Team": "frontend"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Rebuild container image with updated base image containing libc6 version 2.31-0ubuntu9.8 or later."
+        }
+      },
+      "inspectorScore": 9.1,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 9.1,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-02-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in backend API container",
+      "title": "CVE-2024-0012 - Express.js Prototype Pollution",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T09:00:00Z",
+      "lastObservedAt": "2024-02-01T10:30:00Z",
+      "updatedAt": "2024-02-01T10:30:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0012",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0012",
+        "vulnerablePackages": [
+          {
+            "name": "express",
+            "version": "4.18.2",
+            "epoch": 0,
+            "release": "",
+            "architecture": "noarch",
+            "packageManager": "NPM",
+            "fixedInVersion": "4.19.1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "123456789012.dkr.ecr.us-east-1.amazonaws.com/api-backend:latest",
+          "type": "AWS_ECR_CONTAINER_IMAGE",
+          "tags": {
+            "Name": "api-backend",
+            "Version": "2.1.0",
+            "Team": "backend"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update express package to version 4.19.1 or later and rebuild container image."
+        }
+      },
+      "inspectorScore": 7.9,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.9,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-03-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Medium severity vulnerability in database container",
+      "title": "CVE-2024-0013 - PostgreSQL Container Image Vulnerability",
+      "severity": "MEDIUM",
+      "firstObservedAt": "2024-01-01T10:00:00Z",
+      "lastObservedAt": "2024-02-01T11:00:00Z",
+      "updatedAt": "2024-02-01T11:00:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0013",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0013",
+        "vulnerablePackages": [
+          {
+            "name": "postgresql-client-13",
+            "version": "13.13-1.pgdg20.04+1",
+            "epoch": 0,
+            "release": "",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "13.14-1.pgdg20.04+1"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "123456789012.dkr.ecr.us-east-1.amazonaws.com/postgres-db:latest",
+          "type": "AWS_ECR_CONTAINER_IMAGE",
+          "tags": {
+            "Name": "postgres-db",
+            "Version": "13.13",
+            "Team": "data"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update postgresql-client-13 to version 13.14-1.pgdg20.04+1 or later and rebuild container image."
+        }
+      },
+      "inspectorScore": 5.4,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 5.4,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-04-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in monitoring container",
+      "title": "CVE-2024-0014 - Prometheus Metrics Exposure",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T11:00:00Z",
+      "lastObservedAt": "2024-02-01T12:00:00Z",
+      "updatedAt": "2024-02-01T12:00:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0014",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0014",
+        "vulnerablePackages": [
+          {
+            "name": "prometheus",
+            "version": "2.45.0",
+            "epoch": 0,
+            "release": "",
+            "architecture": "amd64",
+            "packageManager": "BINARY",
+            "fixedInVersion": "2.46.0"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "123456789012.dkr.ecr.us-east-1.amazonaws.com/monitoring-prometheus:latest",
+          "type": "AWS_ECR_CONTAINER_IMAGE",
+          "tags": {
+            "Name": "monitoring-prometheus",
+            "Version": "2.45.0",
+            "Team": "ops"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update Prometheus to version 2.46.0 or later and rebuild container image."
+        }
+      },
+      "inspectorScore": 7.1,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.1,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecr-05-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Medium severity vulnerability in nginx proxy container",
+      "title": "CVE-2024-0015 - Nginx Proxy Container Vulnerability",
+      "severity": "MEDIUM",
+      "firstObservedAt": "2024-01-01T12:00:00Z",
+      "lastObservedAt": "2024-02-01T13:00:00Z",
+      "updatedAt": "2024-02-01T13:00:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0015",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0015",
+        "vulnerablePackages": [
+          {
+            "name": "nginx",
+            "version": "1.21.6",
+            "epoch": 0,
+            "release": "1~bullseye",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "1.22.1-1~bullseye"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "123456789012.dkr.ecr.us-east-1.amazonaws.com/nginx-proxy:latest",
+          "type": "AWS_ECR_CONTAINER_IMAGE",
+          "tags": {
+            "Name": "nginx-proxy",
+            "Version": "1.21.6",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update nginx to version 1.22.1-1~bullseye or later and rebuild container image."
+        }
+      },
+      "inspectorScore": 6.3,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 6.3,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecs-01-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "Critical vulnerability in ECS frontend container",
+      "title": "CVE-2024-0016 - React XSS Vulnerability",
+      "severity": "CRITICAL",
+      "firstObservedAt": "2024-01-01T13:00:00Z",
+      "lastObservedAt": "2024-02-01T14:00:00Z",
+      "updatedAt": "2024-02-01T14:00:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0016",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0016",
+        "vulnerablePackages": [
+          {
+            "name": "react",
+            "version": "18.2.0",
+            "epoch": 0,
+            "release": "",
+            "architecture": "noarch",
+            "packageManager": "NPM",
+            "fixedInVersion": "18.2.3"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "arn:aws:ecs:us-east-1:123456789012:container-instance/frontend-cluster/12345678-1234-1234-1234-123456789012",
+          "type": "AWS_ECS_CONTAINER_INSTANCE",
+          "tags": {
+            "Name": "frontend-container",
+            "Service": "webapp-frontend",
+            "Cluster": "frontend-cluster"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update React to version 18.2.3 or later and redeploy ECS service."
+        }
+      },
+      "inspectorScore": 8.9,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 8.9,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ecs-02-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "High severity vulnerability in ECS backend container",
+      "title": "CVE-2024-0017 - Express Session Hijacking",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-01-01T14:00:00Z",
+      "lastObservedAt": "2024-02-01T15:00:00Z",
+      "updatedAt": "2024-02-01T15:00:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0017",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0017",
+        "vulnerablePackages": [
+          {
+            "name": "express-session",
+            "version": "1.17.2",
+            "epoch": 0,
+            "release": "",
+            "architecture": "noarch",
+            "packageManager": "NPM",
+            "fixedInVersion": "1.17.3"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "arn:aws:ecs:us-east-1:123456789012:container-instance/backend-cluster/87654321-4321-4321-4321-876543210987",
+          "type": "AWS_ECS_CONTAINER_INSTANCE",
+          "tags": {
+            "Name": "backend-container",
+            "Service": "api-backend",
+            "Cluster": "backend-cluster"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update express-session to version 1.17.3 or later and redeploy ECS service."
+        }
+      },
+      "inspectorScore": 7.6,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.6,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    },
+    {
+      "findingArn": "arn:aws:inspector2:us-east-1:123456789012:finding/ec2-new-001",
+      "awsAccountId": "123456789012",
+      "type": "PACKAGE_VULNERABILITY",
+      "description": "New high severity vulnerability discovered in kernel",
+      "title": "CVE-2024-0018 - Linux Kernel Privilege Escalation",
+      "severity": "HIGH",
+      "firstObservedAt": "2024-02-01T08:00:00Z",
+      "lastObservedAt": "2024-02-01T08:15:00Z",
+      "updatedAt": "2024-02-01T08:15:00Z",
+      "status": "ACTIVE",
+      "fixAvailable": "YES",
+      "packageVulnerabilityDetails": {
+        "vulnerabilityId": "CVE-2024-0018",
+        "source": "NVD",
+        "sourceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-0018",
+        "vulnerablePackages": [
+          {
+            "name": "linux-image-5.4.0",
+            "version": "5.4.0-150.167",
+            "epoch": 0,
+            "release": "",
+            "architecture": "amd64",
+            "packageManager": "DPKG",
+            "fixedInVersion": "5.4.0-151.168"
+          }
+        ]
+      },
+      "resources": [
+        {
+          "id": "i-0a1b2c3d4e5f6g7h8",
+          "type": "AWS_EC2_INSTANCE",
+          "tags": {
+            "Name": "web-server-prod-01",
+            "Environment": "production",
+            "Team": "platform"
+          }
+        }
+      ],
+      "remediation": {
+        "recommendation": {
+          "text": "Update linux kernel to version 5.4.0-151.168 or later and reboot system."
+        }
+      },
+      "inspectorScore": 7.4,
+      "inspectorScoreDetails": {
+        "adjustedCvss": {
+          "score": 7.4,
+          "scoreSource": "NVD",
+          "version": "3.1"
+        }
+      }
+    }
+  ]
+}

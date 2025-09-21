@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PostgreSQL Database Service Implementation
  * Provides the concrete implementation for the database facade
  */
@@ -144,14 +144,33 @@ class PostgreSQLDatabaseService {
         return result.rows[0] || null;
     }
 
-    async insertReport(reportData) {
-        const filename = reportData.filename;
-        const vulnerabilityCount = reportData.vulnerabilityCount ?? reportData.vulnerability_count ?? 0;
-        const awsAccountId = reportData.awsAccountId ?? reportData.aws_account_id ?? null;
-        const reportRunDate = reportData.reportRunDate ?? reportData.report_run_date ?? null;
-        const fileSize = reportData.fileSize ?? reportData.file_size ?? null;
-        const status = reportData.status ?? 'PROCESSING';
-        const errorMessage = reportData.errorMessage ?? reportData.error_message ?? null;
+    async insertReport(reportData, legacyVulnerabilityCount, legacyAwsAccountId, legacyReportRunDate, legacyFileSize, legacyStatus = 'PROCESSING', legacyErrorMessage = null) {
+        let normalized = reportData;
+
+        if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+            normalized = {
+                filename: typeof reportData === 'string' ? reportData : null,
+                vulnerabilityCount: legacyVulnerabilityCount ?? 0,
+                awsAccountId: legacyAwsAccountId ?? null,
+                reportRunDate: legacyReportRunDate ?? null,
+                fileSize: legacyFileSize ?? null,
+                status: legacyStatus ?? 'PROCESSING',
+                errorMessage: legacyErrorMessage
+            };
+        }
+
+        const filename = normalized.filename;
+
+        if (!filename) {
+            throw new Error('Report filename is required');
+        }
+
+        const vulnerabilityCount = normalized.vulnerabilityCount ?? normalized.vulnerability_count ?? 0;
+        const awsAccountId = normalized.awsAccountId ?? normalized.aws_account_id ?? null;
+        const reportRunDate = normalized.reportRunDate ?? normalized.report_run_date ?? null;
+        const fileSize = normalized.fileSize ?? normalized.file_size ?? null;
+        const status = normalized.status ?? 'PROCESSING';
+        const errorMessage = normalized.errorMessage ?? normalized.error_message ?? null;
 
         const result = await this.query(`
             INSERT INTO reports (

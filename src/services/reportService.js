@@ -1,4 +1,4 @@
-const HistoryService = require('./historyService');
+﻿const HistoryService = require('./historyService');
 const { UploadEventService } = require('./uploadEventService');
 
 class ReportService {
@@ -118,7 +118,12 @@ class ReportService {
             const awsAccountId = findings.length > 0 ? findings[0].awsAccountId : 'unknown';
 
             // Insert main report record
-            const reportId = await db.insertReport(filename, findings.length, awsAccountId, reportRunDate);
+            const reportId = await db.insertReport({
+                filename,
+                vulnerabilityCount: findings.length,
+                awsAccountId,
+                reportRunDate
+            });
 
             // Process each finding
             for (const finding of findings) {

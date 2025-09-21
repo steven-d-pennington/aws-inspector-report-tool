@@ -1,0 +1,100 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEMORY_LIMIT:-512M}
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Don't expose database port in production
+    ports: []
+
+  app:
+    build:
+      target: production
+      args:
+        - NODE_ENV=production
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      DB_SSL_MODE: require
+      ENABLE_HOT_RELOAD: "false"
+    secrets:
+      - db_password
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY_LIMIT:-1024M}
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    # Security: Read-only root filesystem
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/tmp
+    # Security: Drop unnecessary capabilities
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    # Security: No new privileges
+    security_opt:
+      - no-new-privileges:true
+
+# Production secrets management
+secrets:
+  db_password:
+    external: true
+    # Or use file-based secret:
+    # file: ./secrets/db_password.txt
+
+# Add backup service for production
+services:
+  backup:
+    image: postgres:15-alpine
+    container_name: aws-inspector-backup
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USER:-appuser}
+      PGPASSWORD_FILE: /run/secrets/db_password
+      PGDATABASE: ${DB_NAME:-vulnerability_dashboard}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-postgres.sh:/backup.sh:ro
+    secrets:
+      - db_password
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Run daily backup at 2 AM
+    command: ["sh", "-c", "while true; do /backup.sh; sleep 86400; done"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'

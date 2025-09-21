@@ -10,6 +10,9 @@ const { Pool } = require('pg');
 // Ensure environment variables from the project root .env file are loaded
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+// Import our centralized environment configuration
+const environmentConfig = require('./environment');
+
 function parseBoolean(value, fallback = false) {
     if (value === undefined || value === null) {
         return fallback;
@@ -79,6 +82,9 @@ class DatabasePool {
     }
 
     buildConfig() {
+        // Use centralized environment configuration
+        const dbConfig = environmentConfig.getConfig('database');
+
         const connectionString =
             process.env.DATABASE_URL ||
             process.env.DB_URL ||
@@ -88,11 +94,7 @@ class DatabasePool {
 
         const parsedUrlConfig = parseDatabaseUrl(connectionString);
 
-        const host =
-            process.env.POSTGRES_HOST ||
-            process.env.DB_HOST ||
-            parsedUrlConfig.host ||
-            'localhost';
+        const host = dbConfig.host || parsedUrlConfig.host || 'localhost';
         const port = parseInteger(
             process.env.POSTGRES_PORT || process.env.DB_PORT,
             parsedUrlConfig.port ?? 5432
