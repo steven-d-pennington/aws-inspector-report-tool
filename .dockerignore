@@ -59,4 +59,13 @@ temp
 # Build artifacts
 dist
 build
-out
+out# Keep application sources needed for Fly builds
+!package.json
+!package-lock.json
+!server.js
+!src/**
+!scripts/**
+!migrations/**
+!views/**
+!public/**
+!uploads/**

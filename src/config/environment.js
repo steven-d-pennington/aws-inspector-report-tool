@@ -21,7 +21,7 @@ class EnvironmentConfig {
     return {
       // Application Settings
       NODE_ENV: process.env.NODE_ENV || 'development',
-      PORT: parseInt(process.env.PORT) || 3000,
+      PORT: parseInt(process.env.PORT) || 3010,
       HOST: process.env.HOST || '0.0.0.0',
       LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 

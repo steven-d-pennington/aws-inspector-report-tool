@@ -31,7 +31,7 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
     ports:
-      - "3000:3000"
+      - "3010:3010"
       - "9229:9229"  # Node.js debugger port
     command: ["npx", "nodemon", "--inspect=0.0.0.0:9229", "server.js"]
     stdin_open: true

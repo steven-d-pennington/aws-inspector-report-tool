@@ -30,7 +30,7 @@ services:
     container_name: ${CONTAINER_NAME:-aws-inspector-app}
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-3000}
+      PORT: ${PORT:-3010}
       HOST: ${HOST:-0.0.0.0}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       DB_HOST: postgres
@@ -45,7 +45,7 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
     ports:
-      - "${PORT:-3000}:3000"
+      - "${PORT:-3010}:3010"
     networks:
       - app_network
     depends_on:

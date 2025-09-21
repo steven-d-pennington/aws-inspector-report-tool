@@ -1,0 +1,33 @@
+app = "aws-inspector-report-tool"
+primary_region = "lax"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  HOST = "0.0.0.0"
+  PORT = "3010"
+  LOG_LEVEL = "info"
+  ADMIN_ENABLED = "true"
+  DB_SSL_MODE = "disable"
+
+[deploy]
+  release_command = "node scripts/migrate.js"
+
+[http_service]
+  internal_port = 3010
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[mounts]]
+  source = "uploads"
+  destination = "/app/uploads"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
