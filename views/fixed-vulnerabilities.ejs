@@ -79,11 +79,27 @@
                         <label for="resourceType">Resource Type</label>
                         <select id="resourceType" name="resourceType">
                             <option value="">All Resource Types</option>
-                            <option value="EC2Instance">EC2 Instance</option>
-                            <option value="ECRContainerImage">ECR Container Image</option>
-                            <option value="ECRRepository">ECR Repository</option>
-                            <option value="LambdaFunction">Lambda Function</option>
+                            <% if (filterOptions && Array.isArray(filterOptions.resourceTypes)) { %>
+                                <% const resourceTypeLabels = {
+                                    AWS_EC2_INSTANCE: 'EC2 Instance',
+                                    AWS_ECR_CONTAINER_IMAGE: 'ECR Container Image',
+                                    AWS_ECR_REPOSITORY: 'ECR Repository',
+                                    AWS_LAMBDA_FUNCTION: 'Lambda Function'
+                                }; %>
+                                <% filterOptions.resourceTypes.forEach(type => { %>
+                                    <option value="<%= type %>">
+                                        <%= resourceTypeLabels[type] || type %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
                         </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resourceId">Resource ID</label>
+                        <input type="text" id="resourceId" name="resourceId"
+                               placeholder="e.g., i-0abc123def456789"
+                               title="Filter by specific resource identifier">
                     </div>
                 </div>
 
@@ -145,6 +161,10 @@
                 <h3>Fixed Vulnerabilities</h3>
                 <div class="table-controls">
                     <span id="resultsInfo" class="results-info"></span>
+                    <div class="card-controls">
+                        <button type="button" id="expandAllCards" class="btn btn-secondary btn-small" disabled>Expand All</button>
+                        <button type="button" id="collapseAllCards" class="btn btn-secondary btn-small" disabled>Collapse All</button>
+                    </div>
                     <div class="pagination-controls">
                         <button type="button" id="prevPage" class="btn btn-small" disabled>Previous</button>
                         <span id="pageInfo">Page 1 of 1</span>
@@ -153,26 +173,8 @@
                 </div>
             </div>
 
-            <div class="table-container">
-                <table id="fixedVulnerabilitiesTable" class="vulnerabilities-table">
-                    <thead>
-                        <tr>
-                            <th>Vulnerability ID</th>
-                            <th>Title</th>
-                            <th>Severity</th>
-                            <th>Affected Resources</th>
-                            <th>First Observed</th>
-                            <th>Report Generated</th>
-                            <th>Fixed Date</th>
-                            <th>Days Active</th>
-                            <th>Fix Available</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="vulnerabilitiesTableBody">
-                        <!-- Table rows will be populated by JavaScript -->
-                    </tbody>
-                </table>
+            <div class="cards-container">
+                <div id="fixedVulnerabilitiesList" class="vulnerabilities-list"></div>
             </div>
         </div>
 

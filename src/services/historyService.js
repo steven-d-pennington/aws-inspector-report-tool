@@ -1,4 +1,4 @@
-/**
+﻿/**
  * History Service - Business logic for vulnerability history tracking and fixed vulnerability analysis
  *
  * This service provides high-level operations for:
@@ -18,15 +18,19 @@ class HistoryService {
      * This is the first step in the upload workflow
      *
      * @param {number} reportId - Report ID that vulnerabilities will be archived from
+     * @param {object} [options] - Additional archive options
+     * @param {string} [options.triggeredByUploadId] - Upload identifier that initiated the archive
+     * @param {number[]} [options.vulnerabilityIds] - Explicit vulnerability ids to archive
      * @returns {Promise<number>} Count of vulnerabilities archived
      */
-    async archiveCurrentVulnerabilities(reportId) {
+    async archiveCurrentVulnerabilities(reportId, options = {}) {
+        const { triggeredByUploadId = null, vulnerabilityIds = null } = options || {};
         try {
             console.log(`Archiving current vulnerabilities from report ${reportId}...`);
 
             const archivedCount = await this.db.archiveVulnerabilities(reportId);
 
-            console.log(`✓ Archived ${archivedCount} vulnerabilities to history`);
+            console.log(`âœ“ Archived ${archivedCount} vulnerabilities to history`);
             return archivedCount;
         } catch (error) {
             console.error('Failed to archive current vulnerabilities:', error);
@@ -69,7 +73,7 @@ class HistoryService {
             // Calculate summary statistics
             const summary = this._calculateFixedVulnerabilitiesSummary(allFixed);
 
-            console.log(`✓ Found ${fixedVulnerabilities.length} fixed vulnerabilities (${totalCount} total)`);
+            console.log(`âœ“ Found ${fixedVulnerabilities.length} fixed vulnerabilities (${totalCount} total)`);
 
             return {
                 data: fixedVulnerabilities,
@@ -94,20 +98,24 @@ class HistoryService {
      * @param {string} findingArn - AWS Inspector finding ARN
      * @returns {Promise<object>} Timeline with current status and history array
      */
-    async getVulnerabilityHistory(findingArn) {
+    async getVulnerabilityHistory(identifier, options = {}) {
         try {
-            console.log(`Getting vulnerability history for: ${findingArn}`);
+            console.log(`Getting vulnerability history for: ${identifier}`);
 
-            const timeline = await this.db.getVulnerabilityTimeline(findingArn);
-
-            console.log(`✓ Retrieved ${timeline.history.length} historical records, status: ${timeline.current_status}`);
+            const timeline = await this.db.getVulnerabilityTimeline(identifier, options);
+            const historyCount = Array.isArray(timeline.history) ? timeline.history.length : 0;
+            console.log(`✓ Retrieved ${historyCount} historical records, status: ${timeline.current_status}`);
             return timeline;
         } catch (error) {
             console.error('Failed to get vulnerability history:', error);
+            if (error.code === 'NOT_FOUND') {
+                const notFoundError = new Error('Vulnerability not found in history or current data');
+                notFoundError.code = 'NOT_FOUND';
+                throw notFoundError;
+            }
             throw new Error(`Vulnerability timeline retrieval failed: ${error.message}`);
         }
     }
-
     /**
      * Validate vulnerability matching logic for fixed vulnerability detection
      * This method implements the primary and secondary matching rules
@@ -219,7 +227,7 @@ class HistoryService {
     async getUploadHistory(filters = {}) {
         try {
             const events = await this.db.getUploadEvents(filters);
-            console.log(`✓ Retrieved ${events.length} upload events`);
+            console.log(`âœ“ Retrieved ${events.length} upload events`);
             return events;
         } catch (error) {
             console.error('Failed to get upload history:', error);
@@ -236,7 +244,7 @@ class HistoryService {
      */
     async validateArchival(findingArn) {
         try {
-            const timeline = await this.db.getVulnerabilityTimeline(findingArn);
+            const timeline = await this.db.getVulnerabilityTimeline(findingArn, { lookupType: 'findingArn' });
             return timeline.history.length > 0;
         } catch (error) {
             return false;
@@ -334,3 +342,4 @@ class HistoryService {
 }
 
 module.exports = HistoryService;
+

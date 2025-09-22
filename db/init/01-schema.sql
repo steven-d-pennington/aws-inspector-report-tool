@@ -213,11 +213,20 @@ CREATE TABLE IF NOT EXISTS vulnerability_history (
     id SERIAL PRIMARY KEY,
     original_vulnerability_id INTEGER,
     vulnerability_id TEXT,
+    finding_arn TEXT,
+    aws_account_id TEXT,
     title TEXT,
     severity VARCHAR(20),
+    status VARCHAR(20),
+    fix_available VARCHAR(10),
+    inspector_score NUMERIC(3,1),
+    epss_score NUMERIC(5,4),
+    exploit_available VARCHAR(10),
     package_name TEXT,
     package_version TEXT,
     fix_version TEXT,
+    first_observed_at TIMESTAMPTZ,
+    last_observed_at TIMESTAMPTZ,
     archived_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     resolution_type VARCHAR(20) DEFAULT 'FIXED',
     CONSTRAINT fk_vulnerability_history_original
@@ -230,6 +239,12 @@ CREATE INDEX IF NOT EXISTS idx_vulnerability_history_vuln_id
     ON vulnerability_history(vulnerability_id);
 CREATE INDEX IF NOT EXISTS idx_vulnerability_history_archived
     ON vulnerability_history(archived_date DESC);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_history_finding_arn
+    ON vulnerability_history(finding_arn);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_history_aws_account
+    ON vulnerability_history(aws_account_id);
+CREATE INDEX IF NOT EXISTS idx_vulnerability_history_severity
+    ON vulnerability_history(severity);
 
 -- ---------------------------------------------------------------------------
 -- Resource History

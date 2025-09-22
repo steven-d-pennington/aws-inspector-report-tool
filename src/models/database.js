@@ -61,7 +61,9 @@ class Database {
     async getVulnerabilitiesByIds(ids = []) { return await this.call('getVulnerabilitiesByIds', ids); }
     async getVulnerabilitiesGroupedByCVE(filters = {}) { return await this.call('getVulnerabilitiesGroupedByCVE', filters); }
     async getFixedVulnerabilities(filters = {}) { return await this.call('getFixedVulnerabilities', filters); }
-    async getVulnerabilityTimeline(findingArn) { return await this.call('getVulnerabilityTimeline', findingArn); }
+    async getVulnerabilityTimeline(identifier, options = {}) {
+        return await this.call('getVulnerabilityTimeline', identifier, options);
+    }
     async insertVulnerability(...args) { return await this.call('insertVulnerability', ...args); }
     async insertResource(...args) { return await this.call('insertResource', ...args); }
     async insertPackage(...args) { return await this.call('insertPackage', ...args); }
@@ -69,7 +71,7 @@ class Database {
     async insertVulnerabilities(vulnArray) { return await this.call('insertVulnerabilities', vulnArray); }
     async updateVulnerability(id, updates) { return await this.call('updateVulnerability', id, updates); }
     async deleteVulnerability(id) { return await this.call('deleteVulnerability', id); }
-    async archiveVulnerabilities(vulnerabilityIds) { return await this.call('archiveVulnerabilities', vulnerabilityIds); }
+    async archiveVulnerabilities(options = {}) { return await this.call('archiveVulnerabilities', options); }
 
     // Table management
     async clearCurrentTables() { return await this.call('clearCurrentTables'); }

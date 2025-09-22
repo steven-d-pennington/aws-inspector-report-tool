@@ -958,6 +958,102 @@ code {
     padding-top: 15px;
 }
 
+.card-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cards-container {
+    padding: 0 30px 30px;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.summary-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.04em;
+}
+
+.summary-value {
+    display: block;
+    margin-top: 4px;
+    font-weight: 600;
+    color: #333;
+    word-break: break-word;
+}
+
+.metadata-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.resource-type-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.resource-list {
+    margin-top: 20px;
+}
+
+.resource-list h4 {
+    margin-bottom: 8px;
+    color: #666;
+}
+
+.resource-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.resource-list li {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+.more-resources {
+    color: #6c757d;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.card-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .card-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .cards-container {
+        padding: 0 20px 20px;
+    }
+}
+
 .vuln-description-short {
     color: #666;
     line-height: 1.5;
