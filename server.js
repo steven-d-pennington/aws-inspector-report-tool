@@ -11,6 +11,7 @@ const reportService = require('./src/services/reportService');
 const exportService = require('./src/services/exportService');
 const HistoryService = require('./src/services/historyService');
 const SettingsService = require('./src/services/settingsService');
+const { ReportFilenameParser } = require('./src/utils/reportFilenameParser');
 
 // Import environment configuration and new routes
 const environmentConfig = require('./src/config/environment');
@@ -49,6 +50,26 @@ const upload = multer({
     storage: storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
 });
+
+async function cleanupUploadedFiles(files) {
+    if (!files || files.length === 0) {
+        return;
+    }
+
+    for (const file of files) {
+        if (!file || !file.path) {
+            continue;
+        }
+
+        try {
+            await fs.unlink(file.path);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('File cleanup error:', error);
+            }
+        }
+    }
+}
 
 // Initialize database
 const db = new Database();
@@ -189,151 +210,178 @@ app.get('/vulnerabilities', async (req, res) => {
     }
 });
 
-app.post('/upload', upload.single('reportFile'), async (req, res) => {
+app.post('/upload', upload.any(), async (req, res) => {
     const startTime = Date.now();
 
+    // Collect uploaded files from supported field names
+    const uploadedFiles = (req.files || []).filter((file) =>
+        file.fieldname === 'reportFiles' || file.fieldname === 'reportFile'
+    );
+
+    if (uploadedFiles.length === 0) {
+        return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    // Import required services lazily to avoid circular dependencies
+    const fileTypeDetector = require('./src/utils/fileTypeDetector');
+    const csvParserService = require('./src/services/csvParserService');
+    const dateValidator = require('./src/utils/dateValidator');
+
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+        // Derive and validate report dates from filenames
+        const filesWithDates = uploadedFiles.map((file) => {
+            try {
+                const parsed = ReportFilenameParser.parse(file.originalname);
+                const validation = dateValidator.validateReportRunDate(parsed.normalizedDate);
 
-        const filePath = req.file.path;
-        const fileName = req.file.originalname;
+                if (!validation.isValid) {
+                    const validationError = new Error(validation.error || 'Invalid report date derived from filename.');
+                    validationError.statusCode = 400;
+                    validationError.details = {
+                        filename: file.originalname,
+                        field: validation.field,
+                        error: validation.error
+                    };
+                    throw validationError;
+                }
 
-        // Import required services
-        const fileTypeDetector = require('./src/utils/fileTypeDetector');
-        const csvParserService = require('./src/services/csvParserService');
-        const dateValidator = require('./src/utils/dateValidator');
+                return {
+                    file,
+                    derivedDate: parsed.normalizedDate,
+                    normalizedReportRunDate: validation.date
+                };
+            } catch (error) {
+                if (!error.statusCode) {
+                    error.statusCode = 400;
+                    error.details = {
+                        filename: file.originalname
+                    };
+                }
+                throw error;
+            }
+        });
 
-        // Validate report run date from form data
-        const reportRunDate = req.body.reportDate || req.body.reportRunDate;
-        const dateValidation = dateValidator.validateReportRunDate(reportRunDate);
+        // Ensure files are processed chronologically based on derived dates
+        filesWithDates.sort((a, b) =>
+            new Date(a.normalizedReportRunDate) - new Date(b.normalizedReportRunDate)
+        );
 
-        if (!dateValidation.isValid) {
-            // Clean up uploaded file
-            await fs.unlink(filePath);
+        const processedReports = [];
+        let totalVulnerabilities = 0;
 
-            return res.status(400).json({
-                success: false,
-                error: 'Validation failed',
-                details: dateValidation.error,
-                field: dateValidation.field
-            });
-        }
+        for (const fileEntry of filesWithDates) {
+            const { file, normalizedReportRunDate } = fileEntry;
+            const fileStartTime = Date.now();
 
-        const normalizedReportRunDate = dateValidation.date;
+            const fileTypeInfo = fileTypeDetector.getFileTypeInfo(file.originalname, file.path);
 
-        // Detect file format
-        const fileTypeInfo = fileTypeDetector.getFileTypeInfo(fileName, filePath);
-
-        if (!fileTypeInfo.isSupported) {
-            // Clean up uploaded file
-            await fs.unlink(filePath);
-
-            return res.status(415).json({
-                error: fileTypeInfo.message,
-                supportedFormats: fileTypeInfo.supportedFormats,
-                detectedFormat: fileTypeInfo.extension
-            });
-        }
-
-        let reportData;
-        let fileFormat;
-
-        // Parse file based on detected format
-        if (fileTypeInfo.extension === '.json') {
-            // Existing JSON parsing logic
-            const fileContent = await fs.readFile(filePath, 'utf-8');
-            reportData = JSON.parse(fileContent);
-            fileFormat = 'json';
-
-        } else if (fileTypeInfo.extension === '.csv') {
-            // New CSV parsing logic
-            const csvResult = await csvParserService.parseInspectorCSV(filePath, {
-                validateSchema: true,
-                skipInvalidRows: false
-            });
-
-            if (csvResult.errors && csvResult.errors.length > 0) {
-                // Clean up uploaded file
-                await fs.unlink(filePath);
-
-                return res.status(400).json({
-                    error: 'CSV validation failed',
-                    validationErrors: csvResult.errors,
-                    requiredColumns: csvParserService.requiredColumns
-                });
+            if (!fileTypeInfo.isSupported) {
+                const unsupportedError = new Error(fileTypeInfo.message || 'Unsupported file format');
+                unsupportedError.statusCode = 415;
+                unsupportedError.details = {
+                    filename: file.originalname,
+                    supportedFormats: fileTypeInfo.supportedFormats,
+                    detectedFormat: fileTypeInfo.extension
+                };
+                throw unsupportedError;
             }
 
-            // Transform CSV result to match expected JSON structure
-            reportData = {
-                findings: csvResult.findings
-            };
-            fileFormat = 'csv';
+            let reportData;
+            let fileFormat;
 
-        } else {
-            // This shouldn't happen due to earlier validation, but just in case
-            await fs.unlink(filePath);
-            return res.status(415).json({
-                error: 'Unsupported file format',
-                supportedFormats: fileTypeInfo.supportedFormats
+            if (fileTypeInfo.extension === '.json') {
+                const fileContent = await fs.readFile(file.path, 'utf-8');
+                reportData = JSON.parse(fileContent);
+                fileFormat = 'json';
+            } else if (fileTypeInfo.extension === '.csv') {
+                const csvResult = await csvParserService.parseInspectorCSV(file.path, {
+                    validateSchema: true,
+                    skipInvalidRows: false
+                });
+
+                if (csvResult.errors && csvResult.errors.length > 0) {
+                    const csvError = new Error('CSV validation failed');
+                    csvError.statusCode = 400;
+                    csvError.details = {
+                        filename: file.originalname,
+                        validationErrors: csvResult.errors,
+                        requiredColumns: csvParserService.requiredColumns
+                    };
+                    throw csvError;
+                }
+
+                reportData = {
+                    findings: csvResult.findings
+                };
+                fileFormat = 'csv';
+            } else {
+                const genericError = new Error('Unsupported file format');
+                genericError.statusCode = 415;
+                genericError.details = {
+                    filename: file.originalname,
+                    supportedFormats: fileTypeInfo.supportedFormats
+                };
+                throw genericError;
+            }
+
+            const reportId = await reportService.processReport(
+                reportData,
+                db,
+                file.originalname,
+                normalizedReportRunDate
+            );
+
+            await fs.unlink(file.path);
+
+            const vulnerabilityCount = reportData.findings ? reportData.findings.length : 0;
+            totalVulnerabilities += vulnerabilityCount;
+
+            processedReports.push({
+                filename: file.originalname,
+                reportId,
+                vulnerabilityCount,
+                fileFormat,
+                processingTime: Date.now() - fileStartTime,
+                uploadDate: new Date().toISOString(),
+                reportRunDate: normalizedReportRunDate
             });
         }
 
-        // Process and store the report (same logic for both formats)
-        const reportId = await reportService.processReport(reportData, db, fileName, normalizedReportRunDate);
-
-        // Clean up uploaded file
-        await fs.unlink(filePath);
-
         const processingTime = Date.now() - startTime;
+        const totalProcessed = processedReports.length;
 
         res.json({
             success: true,
-            message: 'Report processed successfully',
-            reportId: reportId,
-            vulnerabilityCount: reportData.findings ? reportData.findings.length : 0,
-            fileFormat: fileFormat,
-            processingTime: processingTime,
-            uploadDate: new Date().toISOString(),
-            reportRunDate: normalizedReportRunDate
+            message: `Processed ${totalProcessed} report${totalProcessed === 1 ? '' : 's'} successfully`,
+            processedReports,
+            totalProcessed,
+            totalVulnerabilities,
+            processingTime
         });
-
     } catch (error) {
         console.error('Upload error:', error);
 
-        // Clean up uploaded file if it exists
-        try {
-            if (req.file && req.file.path) {
-                await fs.unlink(req.file.path);
-            }
-        } catch (cleanupError) {
-            console.error('File cleanup error:', cleanupError);
+        await cleanupUploadedFiles(uploadedFiles);
+
+        let statusCode = error.statusCode || 500;
+        const errorResponse = {
+            error: error.message
+        };
+
+        if (error.details) {
+            errorResponse.details = error.details;
         }
 
-        // Determine error type for better user feedback
-        let statusCode = 500;
-        let errorResponse = { error: error.message };
-
-        if (error.message.includes('CSV validation failed') ||
-            error.message.includes('Missing required columns')) {
-            statusCode = 400;
-            errorResponse.errorType = 'VALIDATION_ERROR';
-        } else if (error.message.includes('JSON.parse') ||
-                   error.message.includes('Unexpected token')) {
+        if (error.message && (error.message.includes('JSON.parse') || error.message.includes('Unexpected token'))) {
             statusCode = 400;
             errorResponse.errorType = 'PARSING_ERROR';
             errorResponse.error = 'Invalid JSON format in uploaded file';
-        } else if (error.message.includes('CSV parsing failed')) {
+        } else if (error.message && error.message.includes('CSV parsing failed')) {
             statusCode = 400;
             errorResponse.errorType = 'PARSING_ERROR';
-        }
-
-        if (req.file) {
-            errorResponse.details = {
-                fileName: req.file.originalname,
-                fileSize: req.file.size
-            };
+        } else if (error.message && error.message.includes('CSV validation failed')) {
+            statusCode = 400;
+            errorResponse.errorType = 'VALIDATION_ERROR';
         }
 
         res.status(statusCode).json(errorResponse);

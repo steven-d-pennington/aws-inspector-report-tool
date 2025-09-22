@@ -98,8 +98,10 @@ class EnvironmentConfig {
   // Get database connection string
   getDatabaseConnectionString() {
     const { database } = this.config;
+    const encodedUser = encodeURIComponent(database.user);
+    const passwordSegment = database.password ? `:${encodeURIComponent(database.password)}` : '';
     const sslParam = database.ssl ? '?sslmode=require' : '';
-    return `postgresql://${database.user}:${database.password}@${database.host}:${database.port}/${database.database}${sslParam}`;
+    return `postgresql://${encodedUser}${passwordSegment}@${database.host}:${database.port}/${database.database}${sslParam}`;
   }
 
   // Validate required environment variables

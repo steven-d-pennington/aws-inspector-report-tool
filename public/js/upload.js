@@ -1,84 +1,186 @@
-let selectedFile = null;
+let selectedFiles = [];
+
+const supportedExtensions = ['.json', '.csv'];
+
+const fileInput = document.getElementById('fileInput');
+const uploadArea = document.getElementById('uploadArea');
 
 // File input handling
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    handleFileSelect(e.target.files[0]);
+fileInput.addEventListener('change', (event) => {
+    handleFileSelect(Array.from(event.target.files));
 });
 
 // Drag and drop handling
-const uploadArea = document.getElementById('uploadArea');
-
-uploadArea.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    this.classList.add('dragover');
+uploadArea.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    uploadArea.classList.add('dragover');
 });
 
-uploadArea.addEventListener('dragleave', function(e) {
-    e.preventDefault();
-    this.classList.remove('dragover');
+uploadArea.addEventListener('dragleave', (event) => {
+    event.preventDefault();
+    uploadArea.classList.remove('dragover');
 });
 
-uploadArea.addEventListener('drop', function(e) {
-    e.preventDefault();
-    this.classList.remove('dragover');
+uploadArea.addEventListener('drop', (event) => {
+    event.preventDefault();
+    uploadArea.classList.remove('dragover');
 
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFileSelect(files[0]);
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+        handleFileSelect(Array.from(event.dataTransfer.files));
     }
 });
 
-uploadArea.addEventListener('click', function() {
-    document.getElementById('fileInput').click();
+uploadArea.addEventListener('click', () => {
+    fileInput.click();
 });
 
-function handleFileSelect(file) {
-    if (!file) return;
-
-    // Check for supported file formats (JSON and CSV)
-    const supportedExtensions = ['.json', '.csv'];
-    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-
-    if (!supportedExtensions.includes(fileExtension)) {
-        alert(`Please select a JSON or CSV file. Supported formats: ${supportedExtensions.join(', ')}`);
+function handleFileSelect(files) {
+    if (!files || files.length === 0) {
         return;
     }
 
-    selectedFile = file;
+    const errors = [];
 
-    // Display file information with format indicator
-    document.getElementById('fileName').textContent = file.name;
-    document.getElementById('fileSize').textContent = `Size: ${formatFileSize(file.size)}`;
+    files.forEach((file) => {
+        const extensionIndex = file.name.lastIndexOf('.');
+        const extension = extensionIndex !== -1 ? file.name.substring(extensionIndex).toLowerCase() : '';
 
-    // Add file format indicator
-    const formatIndicator = document.createElement('span');
-    formatIndicator.className = 'file-format-indicator';
-    formatIndicator.textContent = fileExtension.toUpperCase().substring(1) + ' Format';
-    formatIndicator.style.cssText = 'margin-left: 10px; padding: 2px 6px; background: #007bff; color: white; font-size: 10px; border-radius: 3px;';
+        if (!supportedExtensions.includes(extension)) {
+            errors.push(`${file.name}: unsupported file type. Please select JSON or CSV files.`);
+            return;
+        }
 
-    const fileNameElement = document.getElementById('fileName');
-    // Remove any existing format indicators
-    const existingIndicator = fileNameElement.querySelector('.file-format-indicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
+        const derivedDate = extractDateFromFilename(file.name);
+        if (!derivedDate) {
+            errors.push(`${file.name}: filename must follow the MM-DD-YYYY.ext format.`);
+            return;
+        }
+
+        const isDuplicate = selectedFiles.some((entry) =>
+            entry.file.name === file.name && entry.file.size === file.size
+        );
+
+        if (isDuplicate) {
+            errors.push(`${file.name}: already selected, skipping duplicate.`);
+            return;
+        }
+
+        selectedFiles.push({ file, derivedDate });
+    });
+
+    selectedFiles.sort((a, b) => new Date(a.derivedDate) - new Date(b.derivedDate));
+
+    renderSelectedFiles();
+
+    if (errors.length > 0) {
+        alert(errors.join('\n'));
     }
-    fileNameElement.appendChild(formatIndicator);
 
-    document.getElementById('fileInfo').style.display = 'block';
-    document.getElementById('uploadArea').style.display = 'none';
-
-    // Show date picker section after file selection
-    showDatePicker();
+    // Allow the same file to be selected again if needed
+    fileInput.value = '';
 }
 
-function clearFile() {
-    selectedFile = null;
-    document.getElementById('fileInput').value = '';
-    document.getElementById('fileInfo').style.display = 'none';
-    document.getElementById('uploadArea').style.display = 'block';
+function renderSelectedFiles() {
+    const fileInfo = document.getElementById('fileInfo');
+    const selectedFilesList = document.getElementById('selectedFilesList');
 
-    // Hide date picker and reset form
-    hideDatePicker();
+    if (!selectedFilesList) {
+        return;
+    }
+
+    if (selectedFiles.length === 0) {
+        selectedFilesList.innerHTML = '';
+        fileInfo.style.display = 'none';
+        uploadArea.style.display = 'block';
+        return;
+    }
+
+    uploadArea.style.display = 'none';
+    fileInfo.style.display = 'block';
+
+    let html = '<table class="data-table">';
+    html += '<thead><tr><th>Filename</th><th>Report Date</th><th>Size</th><th></th></tr></thead>';
+    html += '<tbody>';
+
+    selectedFiles.forEach((entry, index) => {
+        html += `
+            <tr>
+                <td>${entry.file.name}</td>
+                <td>${formatDisplayDate(entry.derivedDate)}</td>
+                <td>${formatFileSize(entry.file.size)}</td>
+                <td>
+                    <button class="btn btn-small btn-secondary" onclick="removeFile(${index})">
+                        Remove
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table>';
+    html += `<p class="file-info-summary">Files will be uploaded in the order shown (${selectedFiles.length} total).</p>`;
+
+    selectedFilesList.innerHTML = html;
+}
+
+function extractDateFromFilename(fileName) {
+    if (!fileName) {
+        return null;
+    }
+
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const baseName = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+    const match = baseName.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+
+    if (!match) {
+        return null;
+    }
+
+    const month = parseInt(match[1], 10);
+    const day = parseInt(match[2], 10);
+    const year = parseInt(match[3], 10);
+
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() + 1 !== month ||
+        date.getUTCDate() !== day
+    ) {
+        return null;
+    }
+
+    const normalizedMonth = String(month).padStart(2, '0');
+    const normalizedDay = String(day).padStart(2, '0');
+
+    return `${year}-${normalizedMonth}-${normalizedDay}`;
+}
+
+function formatDisplayDate(dateString) {
+    if (!dateString) {
+        return '—';
+    }
+
+    const date = new Date(`${dateString}T00:00:00Z`);
+    if (isNaN(date.getTime())) {
+        return dateString;
+    }
+
+    return date.toLocaleDateString();
+}
+
+function clearFiles() {
+    selectedFiles = [];
+    fileInput.value = '';
+    renderSelectedFiles();
+}
+
+function removeFile(index) {
+    if (index < 0 || index >= selectedFiles.length) {
+        return;
+    }
+
+    selectedFiles.splice(index, 1);
+    renderSelectedFiles();
 }
 
 function formatFileSize(bytes) {
@@ -88,132 +190,25 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// Date picker management functions
-function showDatePicker() {
-    const datePicker = document.getElementById('datePicker');
-    const dateInput = document.getElementById('reportDate');
-
-    // Set up date constraints
-    setupDateConstraints();
-
-    // Show the date picker section with smooth transition
-    datePicker.style.display = 'block';
-    datePicker.setAttribute('aria-hidden', 'false');
-
-    // Set default date to today
-    if (!dateInput.value) {
-        dateInput.value = new Date().toISOString().split('T')[0];
-    }
-
-    // Add event listener for date validation
-    dateInput.addEventListener('change', validateDate);
-    dateInput.addEventListener('blur', validateDate);
-}
-
-function hideDatePicker() {
-    const datePicker = document.getElementById('datePicker');
-    const dateInput = document.getElementById('reportDate');
-
-    // Hide the date picker section
-    datePicker.style.display = 'none';
-    datePicker.setAttribute('aria-hidden', 'true');
-
-    // Reset the date input
-    dateInput.value = '';
-    clearDateError();
-
-    // Remove event listeners
-    dateInput.removeEventListener('change', validateDate);
-    dateInput.removeEventListener('blur', validateDate);
-}
-
-function setupDateConstraints() {
-    const dateInput = document.getElementById('reportDate');
-    const today = new Date();
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(today.getFullYear() - 2);
-
-    // Set max to today (prevent future dates)
-    dateInput.max = today.toISOString().split('T')[0];
-
-    // Set min to 2 years ago
-    dateInput.min = twoYearsAgo.toISOString().split('T')[0];
-}
-
-function validateDate() {
-    const dateInput = document.getElementById('reportDate');
-    const selectedDate = new Date(dateInput.value);
-    const today = new Date();
-    const twoYearsAgo = new Date();
-    twoYearsAgo.setFullYear(today.getFullYear() - 2);
-
-    // Clear previous errors
-    clearDateError();
-
-    if (!dateInput.value) {
-        showDateError('Please select a report generation date.');
-        return false;
-    }
-
-    if (selectedDate > today) {
-        showDateError('Report generation date cannot be in the future.');
-        return false;
-    }
-
-    if (selectedDate < twoYearsAgo) {
-        showDateError('Report generation date cannot be more than 2 years old.');
-        return false;
-    }
-
-    return true;
-}
-
-function showDateError(message) {
-    const dateError = document.getElementById('dateError');
-    const dateInput = document.getElementById('reportDate');
-
-    dateError.textContent = message;
-    dateError.style.display = 'block';
-    dateInput.setAttribute('aria-invalid', 'true');
-    dateInput.classList.add('date-input-error');
-}
-
-function clearDateError() {
-    const dateError = document.getElementById('dateError');
-    const dateInput = document.getElementById('reportDate');
-
-    dateError.textContent = '';
-    dateError.style.display = 'none';
-    dateInput.setAttribute('aria-invalid', 'false');
-    dateInput.classList.remove('date-input-error');
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 async function uploadFile() {
-    if (!selectedFile) {
-        alert('Please select a file');
+    if (selectedFiles.length === 0) {
+        alert('Please select at least one report file to upload.');
         return;
     }
 
-    // Validate the selected date before upload
-    if (!validateDate()) {
-        return;
-    }
+    document.getElementById('uploadResult').style.display = 'none';
 
     const formData = new FormData();
-    formData.append('reportFile', selectedFile);
+    selectedFiles.forEach((entry) => {
+        formData.append('reportFiles', entry.file);
+    });
 
-    // Add the report generation date to the form data
-    const reportDate = document.getElementById('reportDate').value;
-    if (reportDate) {
-        formData.append('reportDate', reportDate);
-    }
-
-    // Show progress
     document.getElementById('fileInfo').style.display = 'none';
     document.getElementById('uploadProgress').style.display = 'block';
+    document.getElementById('progressText').textContent = `Uploading ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}...`;
 
     try {
         const response = await fetch('/upload', {
@@ -228,30 +223,62 @@ async function uploadFile() {
 
         if (response.ok) {
             document.getElementById('resultTitle').textContent = 'Upload Successful!';
-            document.getElementById('resultMessage').textContent = result.message;
+            document.getElementById('resultMessage').textContent = result.message || 'Reports processed successfully.';
 
-            let detailsHTML = `
-                <p><strong>Report ID:</strong> ${result.reportId}</p>
-                <p><strong>Vulnerabilities Processed:</strong> ${result.vulnerabilityCount}</p>
-            `;
+            let detailsHTML = '';
 
-            // Add file format and processing time if available
-            if (result.fileFormat) {
-                detailsHTML += `<p><strong>File Format:</strong> ${result.fileFormat.toUpperCase()}</p>`;
+            if (typeof result.totalProcessed === 'number') {
+                detailsHTML += `<p><strong>Total Files Processed:</strong> ${result.totalProcessed}</p>`;
             }
-            if (result.processingTime) {
-                detailsHTML += `<p><strong>Processing Time:</strong> ${result.processingTime}ms</p>`;
+
+            if (typeof result.totalVulnerabilities === 'number') {
+                detailsHTML += `<p><strong>Total Vulnerabilities Processed:</strong> ${result.totalVulnerabilities}</p>`;
+            }
+
+            if (Array.isArray(result.processedReports) && result.processedReports.length > 0) {
+                detailsHTML += '<table class="data-table">';
+                detailsHTML += '<thead><tr><th>Filename</th><th>Report Date</th><th>Format</th><th>Vulnerabilities</th><th>Report ID</th></tr></thead>';
+                detailsHTML += '<tbody>';
+
+                result.processedReports.forEach((report) => {
+                    const reportDate = report.reportRunDate ? new Date(report.reportRunDate).toLocaleDateString() : '—';
+                    const format = report.fileFormat ? report.fileFormat.toUpperCase() : '—';
+                    const vulnerabilityCount = typeof report.vulnerabilityCount === 'number' ? report.vulnerabilityCount : '—';
+                    const reportId = report.reportId || '—';
+
+                    detailsHTML += `
+                        <tr>
+                            <td>${report.filename}</td>
+                            <td>${reportDate}</td>
+                            <td>${format}</td>
+                            <td>${vulnerabilityCount}</td>
+                            <td>${reportId}</td>
+                        </tr>
+                    `;
+                });
+
+                detailsHTML += '</tbody></table>';
+            }
+
+            if (typeof result.processingTime === 'number') {
+                detailsHTML += `<p><strong>Total Processing Time:</strong> ${result.processingTime}ms</p>`;
             }
 
             document.getElementById('resultDetails').innerHTML = detailsHTML;
             document.getElementById('uploadResult').className = 'result success';
 
-            // Refresh recent reports
+            clearFiles();
             loadRecentReports();
         } else {
             document.getElementById('resultTitle').textContent = 'Upload Failed';
-            document.getElementById('resultMessage').textContent = result.error || 'An error occurred during upload';
-            document.getElementById('resultDetails').innerHTML = '';
+            document.getElementById('resultMessage').textContent = result.error || 'An error occurred during upload.';
+
+            if (result.details) {
+                document.getElementById('resultDetails').innerHTML = `<pre>${JSON.stringify(result.details, null, 2)}</pre>`;
+            } else {
+                document.getElementById('resultDetails').innerHTML = '';
+            }
+
             document.getElementById('uploadResult').className = 'result error';
         }
     } catch (error) {
@@ -265,9 +292,10 @@ async function uploadFile() {
 }
 
 function resetUpload() {
-    clearFile();
+    clearFiles();
     document.getElementById('uploadResult').style.display = 'none';
-    hideDatePicker();
+    document.getElementById('uploadProgress').style.display = 'none';
+    uploadArea.style.display = 'block';
 }
 
 async function loadRecentReports() {
@@ -277,7 +305,7 @@ async function loadRecentReports() {
 
         const recentReportsList = document.getElementById('recentReportsList');
 
-        if (reports.length === 0) {
+        if (!Array.isArray(reports) || reports.length === 0) {
             recentReportsList.innerHTML = '<p>No reports uploaded yet.</p>';
             return;
         }
