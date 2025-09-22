@@ -1470,6 +1470,8 @@ class PostgreSQLDatabaseService {
             throw new Error('Database not initialized');
         }
 
+        const quoteIdent = (name) => `"${name.replace(/"/g, '""')}"`;
+
         const results = {
             recordsCleared: 0,
             tablesCleared: [],
@@ -1477,152 +1479,48 @@ class PostgreSQLDatabaseService {
             errors: []
         };
 
-        // First, check which tables actually exist
         const existingTablesResult = await this.query(`
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
-            AND table_type = 'BASE TABLE'
+              AND table_type = 'BASE TABLE'
         `);
 
         const existingTables = existingTablesResult.rows.map(row => row.table_name);
-        console.log(`📋 Found existing tables: ${existingTables.join(', ')}`);
 
-        // Tables to clear (only if they exist)
-        const tablesToClear = [
-            'references',
-            'packages',
-            'resources',
-            'vulnerabilities',
-            'upload_events',
-            'vulnerability_history',
-            'resource_history'
-        ].filter(table => existingTables.includes(table));
-
-        console.log(`🔄 Will clear tables: ${tablesToClear.join(', ')}`);
-
-        // Clear each table in its own transaction to avoid rollback issues
-        for (const table of tablesToClear) {
-            try {
-                await this.executeTransaction(async () => {
-                    // Get count before clearing
-                    const identifier = table === 'references' ? '"references"' : table;
-                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${identifier}`);
-                    const beforeCount = parseInt(countResult.rows[0]?.count || '0');
-
-                    // Clear the table
-                    await this.query(`DELETE FROM ${identifier}`);
-
-                    results.recordsCleared += beforeCount;
-                    results.tablesCleared.push(table);
-
-                    console.log(`✅ Cleared ${beforeCount} records from ${table}`);
-
-                    // Reset sequence for this table if it has one
-                    try {
-                        const sequenceTarget = table === 'references' ? '"references"' : table;
-                        await this.query(`
-                            SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)
-                            WHERE pg_get_serial_sequence($1, 'id') IS NOT NULL
-                        `, [sequenceTarget]);
-                        console.log(`🔄 Reset sequence for ${table}`);
-                    } catch (seqError) {
-                        // Not all tables have sequences, so this is non-critical
-                        console.log(`ℹ️ No sequence to reset for ${table}`);
-                    }
-                });
-            } catch (error) {
-                console.error(`❌ Failed to clear ${table}:`, error.message);
-                results.errors.push({
-                    table: table,
-                    error: error.message
-                });
-            }
+        if (existingTables.length === 0) {
+            console.log('ℹ️ No tables detected in public schema; nothing to clear.');
+            return results;
         }
 
-        // Check reports table (preserve it)
-        if (existingTables.includes('reports')) {
-            try {
-                const reportCountResult = await this.query(`SELECT COUNT(*) as count FROM reports`);
-                const reportCount = parseInt(reportCountResult.rows[0]?.count || '0');
+        console.log(`📋 Found tables in scope: ${existingTables.join(', ')}`);
 
-                results.preservedTables.push({
-                    table: 'reports',
-                    recordCount: reportCount,
-                    reason: 'Report metadata preserved for audit trail'
-                });
-                console.log(`📊 Preserved ${reportCount} records in reports table`);
+        const tableCounts = await Promise.all(existingTables.map(async (table) => {
+            try {
+                const identifier = quoteIdent(table);
+                const countResult = await this.query(`SELECT COUNT(*) AS count FROM ${identifier}`);
+                const count = parseInt(countResult.rows[0]?.count || '0', 10);
+                return { table, count };
             } catch (error) {
-                console.warn('Failed to check reports table:', error.message);
+                console.warn(`⚠️ Unable to count rows for ${table}: ${error.message}`);
+                return { table, count: 0 };
             }
-        }
+        }));
+
+        results.recordsCleared = tableCounts.reduce((sum, entry) => sum + entry.count, 0);
+        results.tablesCleared = [...existingTables];
+
+        const truncateList = existingTables.map(quoteIdent).join(', ');
+        console.log(`🔄 Truncating all user tables with RESTART IDENTITY CASCADE.`);
+        await this.query(`TRUNCATE TABLE ${truncateList} RESTART IDENTITY CASCADE`);
+
+        console.log(`✅ Completed database clear; removed approximately ${results.recordsCleared} rows.`);
 
         return results;
     }
 
     async clearAllData() {
-        if (!this.pool) {
-            throw new Error('Database not initialized');
-        }
-
-        return await this.executeTransaction(async () => {
-            const results = {
-                recordsCleared: 0,
-                tablesCleared: [],
-                preservedTables: [],
-                errors: []
-            };
-
-            // Clear ALL data tables (more aggressive than clearDatabase)
-            const tablesToClear = [
-                'references',
-                'packages',
-                'resources',
-                'upload_events',
-                'vulnerability_history',
-                'resource_history',
-                'vulnerabilities',
-                'reports'
-            ];
-
-            for (const table of tablesToClear) {
-                try {
-                    const identifier = table === 'references' ? '"references"' : table;
-                    // Get count before clearing
-                    const countResult = await this.query(`SELECT COUNT(*) as count FROM ${identifier}`);
-                    const beforeCount = parseInt(countResult.rows[0]?.count || '0');
-
-                    // Clear the table
-                    await this.query(`DELETE FROM ${identifier}`);
-
-                    results.recordsCleared += beforeCount;
-                    results.tablesCleared.push(table);
-
-                    console.log(`✅ Cleared ${beforeCount} records from ${table}`);
-                } catch (error) {
-                    console.error(`❌ Failed to clear ${table}:`, error.message);
-                    results.errors.push({
-                        table: table,
-                        error: error.message
-                    });
-                }
-            }
-
-            // Reset all sequences
-            for (const table of results.tablesCleared) {
-                try {
-                    const sequenceTarget = table === 'references' ? '"references"' : table;
-                    await this.query(`
-                        SELECT setval(pg_get_serial_sequence($1, 'id'), 1, false)
-                        WHERE pg_get_serial_sequence($1, 'id') IS NOT NULL
-                    `, [sequenceTarget]);
-                } catch (error) {
-                    console.warn(`Warning: Could not reset sequence for ${table}:`, error.message);
-                }
-            }
-
-            return results;
-        });
+        return await this.clearDatabase();
     }
 }
 

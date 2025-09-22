@@ -39,12 +39,14 @@ class FixedVulnerabilitiesManager {
         this.resultsSection = document.getElementById('resultsSection');
         this.emptyState = document.getElementById('emptyState');
 
-        // Table elements
-        this.tableBody = document.getElementById('vulnerabilitiesTableBody');
+        // Result elements
+        this.cardsContainer = document.getElementById('fixedVulnerabilitiesList');
         this.resultsInfo = document.getElementById('resultsInfo');
         this.pageInfo = document.getElementById('pageInfo');
         this.prevPageBtn = document.getElementById('prevPage');
         this.nextPageBtn = document.getElementById('nextPage');
+        this.expandAllBtn = document.getElementById('expandAllCards');
+        this.collapseAllBtn = document.getElementById('collapseAllCards');
 
         // Summary elements
         this.totalFixedEl = document.getElementById('totalFixed');
@@ -97,6 +99,14 @@ class FixedVulnerabilitiesManager {
                 this.loadData();
             }
         });
+
+        if (this.expandAllBtn) {
+            this.expandAllBtn.addEventListener('click', () => this.expandAllCards());
+        }
+
+        if (this.collapseAllBtn) {
+            this.collapseAllBtn.addEventListener('click', () => this.collapseAllCards());
+        }
 
         // Modal close
         this.closeHistoryModalBtn.addEventListener('click', () => {
@@ -196,14 +206,19 @@ class FixedVulnerabilitiesManager {
         this.hideAllStates();
 
         if (data.data.length === 0) {
+            if (this.cardsContainer) {
+                this.cardsContainer.innerHTML = '';
+            }
+            this.updateCardControlsState(0);
             this.showEmptyState();
             return;
         }
 
         this.totalItems = data.pagination.total;
         this.updateSummary(data.summary);
-        this.updateTable(data.data);
+        this.renderCards(data.data);
         this.updatePagination(data.pagination);
+        this.updateCardControlsState(data.data.length);
 
         this.summarySection.style.display = 'block';
         this.resultsSection.style.display = 'block';
@@ -218,68 +233,181 @@ class FixedVulnerabilitiesManager {
         this.lowFixedEl.textContent = summary.low_fixed || 0;
     }
 
-    updateTable(vulnerabilities) {
-        this.tableBody.innerHTML = '';
+    renderCards(vulnerabilities) {
+        if (!this.cardsContainer) {
+            return;
+        }
 
-        vulnerabilities.forEach(vuln => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>
-                    <span class="vulnerability-id">${this.escapeHtml(vuln.vulnerability_id || 'N/A')}</span>
-                </td>
-                <td>
-                    <span class="vulnerability-title" title="${this.escapeHtml(vuln.title || 'No title')}">
-                        ${this.truncateText(vuln.title || 'No title', 50)}
-                    </span>
-                </td>
-                <td>
-                    <span class="severity-badge severity-${(vuln.severity || 'unknown').toLowerCase()}">
-                        ${vuln.severity || 'Unknown'}
-                    </span>
-                </td>
-                <td>
-                    <div class="resource-info">
-                        <span class="resource-count">${(vuln.affected_resources || []).length} resource(s)</span>
-                        ${this.formatResourceTypes(vuln.resource_types || [])}
+        this.cardsContainer.innerHTML = '';
+
+        vulnerabilities.forEach((vuln, index) => {
+            const severity = (vuln.severity || 'unknown').toLowerCase();
+            const card = document.createElement('div');
+            card.className = `vulnerability-card ${severity} collapsed`;
+            card.dataset.cardId = String(index);
+
+            const titleText = this.escapeHtml(vuln.title || vuln.vulnerability_id || 'Unknown vulnerability');
+            const identifier = vuln.vulnerability_id ? this.escapeHtml(vuln.vulnerability_id) : null;
+            const severityLabel = this.escapeHtml(vuln.severity || 'Unknown');
+            const resourceCount = Array.isArray(vuln.affected_resources) ? vuln.affected_resources.length : 0;
+            const resourceBadge = resourceCount > 0
+                ? `<span class="resources-badge">${resourceCount} resource${resourceCount === 1 ? '' : 's'}</span>`
+                : '';
+            const displayFixedDate = this.getDisplayFixedDate(vuln);
+            const firstObserved = vuln.first_observed_at ? this.formatDate(vuln.first_observed_at) : 'Unknown';
+            const lastObserved = vuln.last_observed_at ? this.formatDate(vuln.last_observed_at) : 'Unknown';
+            const reportRun = vuln.report_run_date ? this.formatDate(vuln.report_run_date) : 'Not available';
+            const daysActive = typeof vuln.days_active === 'number'
+                ? `${vuln.days_active} day${vuln.days_active === 1 ? '' : 's'}`
+                : 'Unknown';
+            const resolutionType = this.escapeHtml(vuln.resolution_type || 'Unknown');
+            const fixVersion = this.escapeHtml(vuln.fix_version || 'N/A');
+            const inspectorScore = vuln.inspector_score !== undefined && vuln.inspector_score !== null
+                ? vuln.inspector_score
+                : 'N/A';
+            const epssScore = vuln.epss_score !== undefined && vuln.epss_score !== null
+                ? vuln.epss_score
+                : 'N/A';
+
+            const resourceTypes = Array.isArray(vuln.resource_types) ? vuln.resource_types : [];
+            const resourceTypeBadges = resourceTypes.length
+                ? resourceTypes.map(type => `<span class="resource-type-badge">${this.escapeHtml(type)}</span>`).join(' ')
+                : '';
+
+            const resources = Array.isArray(vuln.affected_resources) ? vuln.affected_resources : [];
+            let resourceListHtml = '';
+            if (resources.length > 0) {
+                const displayResources = resources.slice(0, 5);
+                resourceListHtml = `
+                    <div class="resource-list">
+                        <h4>Affected Resources (${resources.length})</h4>
+                        <ul>
+                            ${displayResources.map(res => `<li><code>${this.escapeHtml(res)}</code></li>`).join('')}
+                        </ul>
+                        ${resources.length > 5 ? `<p class="more-resources">+${resources.length - 5} more</p>` : ''}
                     </div>
-                </td>
-                <td>
-                    <span class="date-text">
-                        ${vuln.first_observed_at ? this.formatDate(vuln.first_observed_at) : 'Unknown'}
-                    </span>
-                </td>
-                <td>
-                    <span class="date-text" title="AWS Inspector report generation date">
-                        ${vuln.report_run_date ? this.formatDate(vuln.report_run_date) : 'Not available'}
-                    </span>
-                </td>
-                <td>
-                    <span class="date-text" title="Date when vulnerability was detected as fixed">
-                        ${this.formatDate(vuln.fixed_date)}
-                    </span>
-                </td>
-                <td>
-                    <span class="days-active">
-                        ${vuln.days_active !== null ? vuln.days_active + ' days' : 'Unknown'}
-                    </span>
-                </td>
-                <td>
-                    <span class="fix-available ${vuln.fix_was_available ? 'yes' : 'no'}">
-                        ${vuln.fix_was_available ? 'Yes' : 'No'}
-                    </span>
-                </td>
-                <td>
-                    <div class="action-buttons">
-                        <button type="button" class="btn btn-small btn-history"
-                                onclick="fixedVulnManager.showHistory('${this.escapeAttribute(vuln.finding_arn)}', '${this.escapeAttribute(vuln.vulnerability_id)}')"
-                                title="View vulnerability history">
-                            History
-                        </button>
+                `;
+            }
+
+            const findingArnAttr = this.escapeAttribute(vuln.finding_arn);
+            const vulnerabilityIdAttr = this.escapeAttribute(vuln.vulnerability_id);
+
+            card.innerHTML = `
+                <div class="vuln-header" data-card-toggle>
+                    <div class="vuln-title">
+                        <h3>${titleText}</h3>
+                        <span class="severity-badge severity-${severity}">${severityLabel}</span>
+                        ${vuln.fix_was_available ? '<span class="fix-badge">Fix Available</span>' : ''}
+                        ${resourceBadge}
                     </div>
-                </td>
+                    <div class="expand-icon">
+                        <span class="arrow">▼</span>
+                    </div>
+                </div>
+                <div class="vuln-summary">
+                    <div class="summary-grid">
+                        ${identifier ? `<div class="summary-item"><span class="summary-label">Identifier</span><span class="summary-value"><code>${identifier}</code></span></div>` : ''}
+                        <div class="summary-item"><span class="summary-label">Fixed Date</span><span class="summary-value">${displayFixedDate}</span></div>
+                        <div class="summary-item"><span class="summary-label">Last Observed</span><span class="summary-value">${lastObserved}</span></div>
+                        <div class="summary-item"><span class="summary-label">Days Active</span><span class="summary-value">${daysActive}</span></div>
+                        <div class="summary-item"><span class="summary-label">Report Generated</span><span class="summary-value">${reportRun}</span></div>
+                    </div>
+                </div>
+                <div class="vuln-content">
+                    <div class="vuln-metadata">
+                        ${identifier ? `<div class="metadata-item"><strong>Identifier:</strong> <code>${identifier}</code></div>` : ''}
+                        <div class="metadata-item"><strong>Severity:</strong> ${severityLabel}</div>
+                        <div class="metadata-item"><strong>Fixed Date:</strong> ${displayFixedDate}</div>
+                        <div class="metadata-item"><strong>First Observed:</strong> ${firstObserved}</div>
+                        <div class="metadata-item"><strong>Last Observed:</strong> ${lastObserved}</div>
+                        <div class="metadata-item"><strong>Report Generated:</strong> ${reportRun}</div>
+                        <div class="metadata-item"><strong>Days Active:</strong> ${daysActive}</div>
+                        <div class="metadata-item"><strong>Resolution:</strong> ${resolutionType}</div>
+                        <div class="metadata-item"><strong>Fix Version:</strong> ${fixVersion}</div>
+                        <div class="metadata-item"><strong>Fix Available:</strong> ${vuln.fix_was_available ? 'Yes' : 'No'}</div>
+                        <div class="metadata-item"><strong>Inspector Score:</strong> ${inspectorScore}</div>
+                        <div class="metadata-item"><strong>EPSS Score:</strong> ${epssScore}</div>
+                        ${resourceTypes.length ? `<div class="metadata-item full-width"><strong>Resource Types:</strong> <div class="resource-type-badges">${resourceTypeBadges}</div></div>` : ''}
+                    </div>
+                    ${resourceListHtml}
+                    <div class="card-actions">
+                        <button type="button" class="btn btn-small btn-history" data-finding-arn="${findingArnAttr}" data-vulnerability-id="${vulnerabilityIdAttr}">History</button>
+                    </div>
+                </div>
             `;
-            this.tableBody.appendChild(row);
+
+            const header = card.querySelector('[data-card-toggle]');
+            if (header) {
+                header.addEventListener('click', () => this.toggleCardElement(card));
+            }
+
+            const historyBtn = card.querySelector('.btn-history');
+            if (historyBtn) {
+                historyBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const target = event.currentTarget;
+                    this.showHistory(target.dataset.findingArn, target.dataset.vulnerabilityId);
+                });
+            }
+
+            this.cardsContainer.appendChild(card);
         });
+    }
+
+    toggleCardElement(card) {
+        if (!card) return;
+
+        if (card.classList.contains('collapsed')) {
+            card.classList.remove('collapsed');
+            card.classList.add('expanded');
+        } else {
+            card.classList.remove('expanded');
+            card.classList.add('collapsed');
+        }
+    }
+
+    expandAllCards() {
+        if (!this.cardsContainer) return;
+        this.cardsContainer.querySelectorAll('.vulnerability-card').forEach(card => {
+            card.classList.remove('collapsed');
+            card.classList.add('expanded');
+        });
+    }
+
+    collapseAllCards() {
+        if (!this.cardsContainer) return;
+        this.cardsContainer.querySelectorAll('.vulnerability-card').forEach(card => {
+            card.classList.remove('expanded');
+            card.classList.add('collapsed');
+        });
+    }
+
+    updateCardControlsState(count) {
+        const disabled = count === 0;
+        if (this.expandAllBtn) {
+            this.expandAllBtn.disabled = disabled;
+        }
+        if (this.collapseAllBtn) {
+            this.collapseAllBtn.disabled = disabled;
+        }
+    }
+
+    getDisplayFixedDate(vuln) {
+        const parseDateValue = (value) => {
+            if (!value) return null;
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const fixedDateValue = parseDateValue(vuln.fixed_date);
+        const lastObservedValue = parseDateValue(vuln.last_observed_at);
+
+        let selectedRaw = vuln.fixed_date || null;
+        if (lastObservedValue && (!fixedDateValue || lastObservedValue < fixedDateValue)) {
+            selectedRaw = vuln.last_observed_at;
+        }
+
+        return selectedRaw ? this.formatDate(selectedRaw) : 'Unknown';
     }
 
     updatePagination(pagination) {
@@ -586,4 +714,3 @@ let fixedVulnManager;
 document.addEventListener('DOMContentLoaded', () => {
     fixedVulnManager = new FixedVulnerabilitiesManager();
 });
-
