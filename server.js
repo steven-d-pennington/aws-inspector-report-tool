@@ -525,30 +525,48 @@ app.get('/api/fixed-vulnerabilities', async (req, res) => {
 });
 
 // Vulnerability History Timeline API
-app.get('/api/vulnerability-history/:findingArn', async (req, res) => {
+app.get('/api/vulnerability-history/:legacyFindingArn?', async (req, res) => {
     try {
-        // Initialize history service
         const historyService = new HistoryService(db);
 
-        // Decode the finding ARN (it may be URL encoded)
-        const findingArn = decodeURIComponent(req.params.findingArn);
+        // Support both the new query parameter lookup and the legacy path format
+        const queryFindingArn = typeof req.query.findingArn === 'string' ? req.query.findingArn : undefined;
+        const queryVulnerabilityId = typeof req.query.vulnerabilityId === 'string' ? req.query.vulnerabilityId : undefined;
+        const legacyFindingArn = typeof req.params.legacyFindingArn === 'string' ? req.params.legacyFindingArn : undefined;
 
-        // Validate finding ARN format (basic validation)
-        if (!findingArn.startsWith('arn:aws:inspector2:')) {
+        let identifier = null;
+        const options = {};
+
+        if (queryFindingArn && queryFindingArn.trim()) {
+            identifier = decodeURIComponent(queryFindingArn.trim());
+            options.lookupType = 'findingArn';
+        } else if (queryVulnerabilityId && queryVulnerabilityId.trim()) {
+            identifier = decodeURIComponent(queryVulnerabilityId.trim());
+            options.lookupType = 'vulnerabilityId';
+        } else if (legacyFindingArn && legacyFindingArn.trim()) {
+            identifier = decodeURIComponent(legacyFindingArn.trim());
+            options.lookupType = 'findingArn';
+        } else {
+            return res.status(400).json({
+                message: 'History lookup requires a findingArn or vulnerabilityId parameter',
+                code: 'MISSING_IDENTIFIER'
+            });
+        }
+
+        if (options.lookupType === 'findingArn' && !identifier.startsWith('arn:aws:inspector2:')) {
             return res.status(400).json({
                 message: 'Invalid finding ARN format',
                 code: 'INVALID_ARN'
             });
         }
 
-        // Get vulnerability history timeline
-        const timeline = await historyService.getVulnerabilityHistory(findingArn);
+        const timeline = await historyService.getVulnerabilityHistory(identifier, options);
 
         res.json(timeline);
     } catch (error) {
         console.error('Vulnerability history API error:', error);
 
-        if (error.message.includes('not found')) {
+        if (error.code === 'NOT_FOUND') {
             return res.status(404).json({
                 message: 'Vulnerability not found in history or current data',
                 code: 'NOT_FOUND'
@@ -882,3 +900,4 @@ db.initialize().then(() => {
     console.error('Failed to initialize database:', err);
     process.exit(1);
 });
+

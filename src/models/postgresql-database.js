@@ -776,17 +776,50 @@ class PostgreSQLDatabaseService {
             }
 
             console.log(`📦 Archiving ${archiveCount} vulnerabilities to history...`);
-
             // Archive vulnerabilities to history table (matching PostgreSQL schema)
             await this.query(`
-                INSERT INTO vulnerability_history
-                (original_vulnerability_id, vulnerability_id, title, severity,
-                 package_name, package_version, fix_version, archived_date, resolution_type)
+                INSERT INTO vulnerability_history (
+                    original_vulnerability_id,
+                    vulnerability_id,
+                    finding_arn,
+                    aws_account_id,
+                    title,
+                    severity,
+                    status,
+                    fix_available,
+                    inspector_score,
+                    epss_score,
+                    exploit_available,
+                    package_name,
+                    package_version,
+                    fix_version,
+                    first_observed_at,
+                    last_observed_at,
+                    archived_date,
+                    resolution_type
+                )
                 SELECT
-                    v.id, v.vulnerability_id, v.title, v.severity,
-                    v.package_name, v.package_version, v.fix_version, CURRENT_TIMESTAMP, 'ARCHIVED'
+                    v.id,
+                    v.vulnerability_id,
+                    v.finding_arn,
+                    v.aws_account_id,
+                    v.title,
+                    v.severity,
+                    v.status,
+                    v.fix_available,
+                    v.inspector_score,
+                    v.epss_score,
+                    v.exploit_available,
+                    v.package_name,
+                    v.package_version,
+                    v.fix_version,
+                    v.first_observed_at,
+                    v.last_observed_at,
+                    CURRENT_TIMESTAMP,
+                    'ARCHIVED'
                 FROM vulnerabilities v
             `);
+
 
             // Archive associated resources to resource_history table
             await this.query(`
@@ -829,7 +862,6 @@ class PostgreSQLDatabaseService {
             const params = [];
             let paramIndex = 1;
 
-            // Add filters for the query
             if (filters.severity) {
                 conditions.push(`h.severity = $${paramIndex++}`);
                 params.push(filters.severity);
@@ -845,7 +877,15 @@ class PostgreSQLDatabaseService {
                 params.push(filters.fixedBefore);
             }
 
-            // Add pagination
+            if (filters.resourceType) {
+                conditions.push(`EXISTS (
+                    SELECT 1 FROM resource_history rh_filter
+                    WHERE rh_filter.vulnerability_history_id = h.id
+                      AND rh_filter.resource_type = $${paramIndex++}
+                )`);
+                params.push(filters.resourceType);
+            }
+
             let limitClause = '';
             if (filters.limit) {
                 limitClause = ` LIMIT $${paramIndex++}`;
@@ -859,49 +899,76 @@ class PostgreSQLDatabaseService {
             }
 
             const query = `
-                SELECT DISTINCT
-                    h.vulnerability_id,
-                    h.title,
-                    h.severity,
-                    h.package_name,
-                    h.package_version,
-                    h.fix_version,
-                    h.archived_date as fixed_date,
-                    h.archived_date as first_observed_at,
-                    h.archived_date as last_observed_at,
-                    h.resolution_type,
-                    CASE WHEN h.fix_version IS NOT NULL THEN 1 ELSE 0 END as fix_was_available,
-                    NULL as days_active,
-                    COALESCE(
-                        string_agg(DISTINCT rh.resource_identifier, ','),
-                        ''
-                    ) as affected_resources,
-                    COALESCE(
-                        string_agg(DISTINCT rh.resource_type, ','),
-                        ''
-                    ) as resource_types
-                FROM vulnerability_history h
-                LEFT JOIN resource_history rh ON rh.vulnerability_history_id = h.id
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM vulnerabilities v
-                    WHERE v.vulnerability_id = h.vulnerability_id
-                       AND v.vulnerability_id IS NOT NULL
-                       AND h.vulnerability_id IS NOT NULL
+                WITH base AS (
+                    SELECT
+                        h.id,
+                        COALESCE(h.finding_arn, h.vulnerability_id) AS finding_arn,
+                        h.vulnerability_id,
+                        h.aws_account_id,
+                        h.title,
+                        h.severity,
+                        COALESCE(h.status, 'FIXED') AS status,
+                        h.package_name,
+                        h.package_version,
+                        h.fix_version,
+                        h.first_observed_at,
+                        h.last_observed_at,
+                        h.archived_date AS fixed_date,
+                        h.resolution_type,
+                        COALESCE(h.fix_available, CASE WHEN h.fix_version IS NOT NULL THEN 'Yes' ELSE 'No' END) AS fix_available,
+                        h.inspector_score,
+                        h.epss_score,
+                        h.exploit_available,
+                        GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (h.archived_date - COALESCE(h.first_observed_at, h.archived_date))) / 86400))::int AS days_active
+                    FROM vulnerability_history h
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM vulnerabilities v
+                        WHERE v.vulnerability_id = h.vulnerability_id
+                          AND v.vulnerability_id IS NOT NULL
+                          AND h.vulnerability_id IS NOT NULL
+                    )
+                      AND ${conditions.join(' AND ')}
                 )
-                AND ${conditions.join(' AND ')}
-                GROUP BY h.id, h.vulnerability_id, h.title, h.severity, h.package_name,
-                         h.package_version, h.fix_version, h.archived_date, h.resolution_type
-                ORDER BY h.archived_date DESC, h.severity DESC
+                SELECT
+                    b.id,
+                    b.finding_arn,
+                    b.vulnerability_id,
+                    b.aws_account_id,
+                    b.title,
+                    b.severity,
+                    b.status,
+                    b.package_name,
+                    b.package_version,
+                    b.fix_version,
+                    b.first_observed_at,
+                    b.last_observed_at,
+                    b.fixed_date,
+                    b.resolution_type,
+                    b.fix_available,
+                    b.inspector_score,
+                    b.epss_score,
+                    b.exploit_available,
+                    b.days_active,
+                    COALESCE(string_agg(DISTINCT rh.resource_identifier, ','), '') AS affected_resources,
+                    COALESCE(string_agg(DISTINCT rh.resource_type, ','), '') AS resource_types
+                FROM base b
+                LEFT JOIN resource_history rh ON rh.vulnerability_history_id = b.id
+                GROUP BY b.id, b.finding_arn, b.vulnerability_id, b.aws_account_id, b.title, b.severity, b.status,
+                         b.package_name, b.package_version, b.fix_version, b.first_observed_at, b.last_observed_at,
+                         b.fixed_date, b.resolution_type, b.fix_available, b.inspector_score, b.epss_score,
+                         b.exploit_available, b.days_active
+                ORDER BY b.fixed_date DESC, b.severity DESC
                 ${limitClause}${offsetClause}
             `;
 
             const result = await this.query(query, params);
 
-            // Process the results to convert comma-separated strings to arrays
             const processedRows = result.rows.map(row => ({
                 ...row,
                 affected_resources: row.affected_resources ? row.affected_resources.split(',').filter(r => r) : [],
-                resource_types: row.resource_types ? row.resource_types.split(',').filter(r => r) : []
+                resource_types: row.resource_types ? row.resource_types.split(',').filter(r => r) : [],
+                fix_was_available: /^yes$/i.test(row.fix_available) ? 1 : 0,
+                days_active: row.days_active !== null ? Number(row.days_active) : null
             }));
 
             return processedRows;
@@ -912,11 +979,230 @@ class PostgreSQLDatabaseService {
         }
     }
 
-    async getVulnerabilityTimeline(findingArn) {
+    async getVulnerabilityTimeline(identifier, options = {}) {
+        if (!identifier || typeof identifier !== 'string') {
+            throw new Error('Identifier is required for vulnerability timeline lookup');
+        }
+
+        const trimmedIdentifier = identifier.trim();
+        if (!trimmedIdentifier) {
+            throw new Error('Identifier is required for vulnerability timeline lookup');
+        }
+
+        const requestedLookup = options.lookupType;
+        const lookupType = requestedLookup || (trimmedIdentifier.startsWith('arn:aws:inspector2:') ? 'findingArn' : 'vulnerabilityId');
+
+        let current = null;
+        let vulnerabilityId = null;
+        let findingArn = null;
+
+        if (lookupType === 'findingArn') {
+            const currentResult = await this.query(`
+                SELECT
+                    finding_arn,
+                    vulnerability_id,
+                    aws_account_id,
+                    title,
+                    severity,
+                    status,
+                    fix_available,
+                    inspector_score,
+                    epss_score,
+                    exploit_available,
+                    package_name,
+                    package_version,
+                    fix_version,
+                    first_observed_at,
+                    last_observed_at,
+                    updated_at
+                FROM vulnerabilities
+                WHERE finding_arn = $1
+                LIMIT 1
+            `, [trimmedIdentifier]);
+
+            if (currentResult.rows.length) {
+                current = currentResult.rows[0];
+                vulnerabilityId = current.vulnerability_id;
+                findingArn = current.finding_arn;
+            } else {
+                findingArn = trimmedIdentifier;
+            }
+        } else {
+            const currentResult = await this.query(`
+                SELECT
+                    finding_arn,
+                    vulnerability_id,
+                    aws_account_id,
+                    title,
+                    severity,
+                    status,
+                    fix_available,
+                    inspector_score,
+                    epss_score,
+                    exploit_available,
+                    package_name,
+                    package_version,
+                    fix_version,
+                    first_observed_at,
+                    last_observed_at,
+                    updated_at
+                FROM vulnerabilities
+                WHERE vulnerability_id = $1
+                LIMIT 1
+            `, [trimmedIdentifier]);
+
+            if (currentResult.rows.length) {
+                current = currentResult.rows[0];
+                vulnerabilityId = current.vulnerability_id;
+                findingArn = current.finding_arn;
+            } else {
+                vulnerabilityId = trimmedIdentifier;
+            }
+        }
+
+        if (!vulnerabilityId && lookupType === 'findingArn') {
+            const historyMatch = await this.query(`
+                SELECT vulnerability_id
+                FROM vulnerability_history
+                WHERE finding_arn = $1
+                ORDER BY archived_date DESC
+                LIMIT 1
+            `, [trimmedIdentifier]);
+
+            if (historyMatch.rows.length) {
+                vulnerabilityId = historyMatch.rows[0].vulnerability_id;
+            }
+        }
+
+        if (!vulnerabilityId) {
+            const notFoundError = new Error('Timeline not found');
+            notFoundError.code = 'NOT_FOUND';
+            throw notFoundError;
+        }
+
+        const historyWhereClause = lookupType === 'findingArn'
+            ? '(h.vulnerability_id = $1 OR h.finding_arn = $2)'
+            : 'h.vulnerability_id = $1';
+        const historyParams = lookupType === 'findingArn'
+            ? [vulnerabilityId, trimmedIdentifier]
+            : [vulnerabilityId];
+
+        const historyResult = await this.query(`
+            SELECT
+                h.id,
+                COALESCE(h.finding_arn, h.vulnerability_id) AS finding_arn,
+                h.vulnerability_id,
+                h.aws_account_id,
+                h.title,
+                h.severity,
+                COALESCE(h.status, h.resolution_type, 'ARCHIVED') AS status,
+                COALESCE(h.fix_available, CASE WHEN h.fix_version IS NOT NULL THEN 'Yes' ELSE 'No' END) AS fix_available,
+                h.inspector_score,
+                h.epss_score,
+                h.exploit_available,
+                h.package_name,
+                h.package_version,
+                h.fix_version,
+                h.first_observed_at,
+                h.last_observed_at,
+                h.archived_date AS archived_at,
+                h.resolution_type
+            FROM vulnerability_history h
+            WHERE ${historyWhereClause}
+            ORDER BY h.archived_date DESC
+        `, historyParams);
+
+        if (!current && historyResult.rows.length === 0) {
+            const notFoundError = new Error('Timeline not found');
+            notFoundError.code = 'NOT_FOUND';
+            throw notFoundError;
+        }
+
+        const historyIds = historyResult.rows.map(row => row.id);
+        const resourceMap = new Map();
+
+        if (historyIds.length > 0) {
+            const resourceResult = await this.query(`
+                SELECT
+                    vulnerability_history_id,
+                    resource_type,
+                    resource_identifier,
+                    region
+                FROM resource_history
+                WHERE vulnerability_history_id = ANY($1::int[])
+            `, [historyIds]);
+
+            for (const resource of resourceResult.rows) {
+                if (!resourceMap.has(resource.vulnerability_history_id)) {
+                    resourceMap.set(resource.vulnerability_history_id, []);
+                }
+                resourceMap.get(resource.vulnerability_history_id).push({
+                    resource_type: resource.resource_type,
+                    resource_identifier: resource.resource_identifier,
+                    region: resource.region
+                });
+            }
+        }
+
+        const history = historyResult.rows.map(row => {
+            const resources = resourceMap.get(row.id) || [];
+            return {
+                id: row.id,
+                finding_arn: row.finding_arn,
+                vulnerability_id: row.vulnerability_id,
+                aws_account_id: row.aws_account_id,
+                title: row.title,
+                severity: row.severity,
+                status: row.status ? row.status.toUpperCase() : 'ARCHIVED',
+                fix_available: row.fix_available,
+                inspector_score: row.inspector_score,
+                epss_score: row.epss_score,
+                exploit_available: row.exploit_available,
+                package_name: row.package_name,
+                package_version: row.package_version,
+                fix_version: row.fix_version,
+                first_observed_at: row.first_observed_at,
+                last_observed_at: row.last_observed_at,
+                archived_at: row.archived_at,
+                resolution_type: row.resolution_type,
+                resources
+            };
+        });
+
+        const currentStatus = current
+            ? (current.status || 'ACTIVE').toUpperCase()
+            : (history.length ? 'FIXED' : 'UNKNOWN');
+
+        const resolvedFindingArn = findingArn
+            || historyResult.rows[0]?.finding_arn
+            || (lookupType === 'findingArn' ? trimmedIdentifier : null)
+            || null;
+
         return {
-            findingArn,
-            current: null,
-            history: []
+            finding_arn: resolvedFindingArn,
+            vulnerability_id: vulnerabilityId,
+            current_status: currentStatus,
+            current: current
+                ? {
+                    finding_arn: current.finding_arn,
+                    vulnerability_id: current.vulnerability_id,
+                    aws_account_id: current.aws_account_id,
+                    title: current.title,
+                    severity: current.severity,
+                    status: current.status,
+                    fix_available: current.fix_available,
+                    inspector_score: current.inspector_score,
+                    epss_score: current.epss_score,
+                    exploit_available: current.exploit_available,
+                    package_name: current.package_name,
+                    package_version: current.package_version,
+                    fix_version: current.fix_version,
+                    first_observed_at: current.first_observed_at,
+                    last_observed_at: current.last_observed_at,
+                    updated_at: current.updated_at
+                }
+                : null,
+            history
         };
     }
 
@@ -1300,3 +1586,5 @@ class PostgreSQLDatabaseService {
 }
 
 module.exports = { PostgreSQLDatabaseService };
+
+

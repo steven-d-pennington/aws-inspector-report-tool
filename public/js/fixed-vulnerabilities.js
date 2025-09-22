@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Fixed Vulnerabilities Page JavaScript
  * Handles filtering, pagination, and display of fixed vulnerabilities
  */
@@ -265,7 +265,7 @@ class FixedVulnerabilitiesManager {
                 <td>
                     <div class="action-buttons">
                         <button type="button" class="btn btn-small btn-history"
-                                onclick="fixedVulnManager.showHistory('${this.escapeHtml(vuln.finding_arn)}')"
+                                onclick="fixedVulnManager.showHistory('${this.escapeAttribute(vuln.finding_arn)}', '${this.escapeAttribute(vuln.vulnerability_id)}')"
                                 title="View vulnerability history">
                             History
                         </button>
@@ -288,7 +288,7 @@ class FixedVulnerabilitiesManager {
         this.nextPageBtn.disabled = !pagination.has_more;
     }
 
-    async showHistory(findingArn) {
+    async showHistory(findingArn, vulnerabilityId) {
         this.historyModal.style.display = 'flex';
         this.historyContent.innerHTML = `
             <div class="loading-spinner"></div>
@@ -296,11 +296,31 @@ class FixedVulnerabilitiesManager {
         `;
 
         try {
-            const encodedArn = encodeURIComponent(findingArn);
-            const response = await fetch(`/api/vulnerability-history/${encodedArn}`);
+            const params = new URLSearchParams();
+            const normalizedArn = (findingArn || '').trim();
+            const normalizedVulnerabilityId = (vulnerabilityId || '').trim();
+
+            if (normalizedArn) {
+                params.set('findingArn', normalizedArn);
+            } else if (normalizedVulnerabilityId) {
+                params.set('vulnerabilityId', normalizedVulnerabilityId);
+            } else {
+                throw new Error('History lookup requires a finding ARN or vulnerability ID');
+            }
+
+            const response = await fetch(`/api/vulnerability-history?${params.toString()}`);
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                let message = `HTTP ${response.status}`;
+                try {
+                    const errorBody = await response.json();
+                    if (errorBody && errorBody.message) {
+                        message = errorBody.message;
+                    }
+                } catch (jsonError) {
+                    // Ignore JSON parse errors and fall back to the default message
+                }
+                throw new Error(message);
             }
 
             const timeline = await response.json();
@@ -311,26 +331,31 @@ class FixedVulnerabilitiesManager {
             this.historyContent.innerHTML = `
                 <div class="error-message">
                     <h4>Failed to load history</h4>
-                    <p>${error.message}</p>
+                    <p>${this.escapeHtml(error.message)}</p>
                 </div>
             `;
         }
     }
-
     displayHistory(timeline) {
+        const identifierLabel = this.escapeHtml(timeline.finding_arn || timeline.vulnerability_id || 'Unknown vulnerability');
+        const statusLabel = (timeline.current_status || 'UNKNOWN').toUpperCase();
+        const statusClass = `status-${statusLabel.toLowerCase()}`;
+        const historyEntries = Array.isArray(timeline.history) ? timeline.history : [];
+
         let historyHtml = `
             <div class="vulnerability-timeline">
                 <div class="timeline-header">
-                    <h4>Finding ARN: ${this.escapeHtml(timeline.finding_arn)}</h4>
-                    <p class="current-status">Current Status: <span class="status-${timeline.current_status.toLowerCase()}">${timeline.current_status}</span></p>
+                    <h4>Identifier: ${identifierLabel}</h4>
+                    <p class="current-status">Current Status: <span class="${statusClass}">${statusLabel}</span></p>
                 </div>
                 <div class="timeline-items">
         `;
 
-        if (timeline.history.length === 0) {
+        if (historyEntries.length === 0) {
             historyHtml += '<p>No historical data available for this vulnerability.</p>';
         } else {
-            timeline.history.forEach((record, index) => {
+            historyEntries.forEach((record) => {
+                const severityLabel = (record.severity || 'unknown').toLowerCase();
                 historyHtml += `
                     <div class="timeline-item">
                         <div class="timeline-marker"></div>
@@ -340,22 +365,28 @@ class FixedVulnerabilitiesManager {
                                 <h5>${this.escapeHtml(record.title || 'Unknown Title')}</h5>
                                 <div class="detail-row">
                                     <span class="detail-label">Severity:</span>
-                                    <span class="severity-badge severity-${(record.severity || 'unknown').toLowerCase()}">
+                                    <span class="severity-badge severity-${severityLabel}">
                                         ${record.severity || 'Unknown'}
                                     </span>
                                 </div>
                                 <div class="detail-row">
                                     <span class="detail-label">Status:</span>
-                                    <span>${record.status || 'Unknown'}</span>
+                                    <span>${this.escapeHtml(record.status || 'Unknown')}</span>
                                 </div>
                                 <div class="detail-row">
                                     <span class="detail-label">Fix Available:</span>
-                                    <span>${record.fix_available || 'Unknown'}</span>
+                                    <span>${this.escapeHtml(record.fix_available || 'Unknown')}</span>
                                 </div>
                                 ${record.inspector_score ? `
                                     <div class="detail-row">
                                         <span class="detail-label">Inspector Score:</span>
                                         <span>${record.inspector_score}</span>
+                                    </div>
+                                ` : ''}
+                                ${record.resources && record.resources.length ? `
+                                    <div class="detail-row">
+                                        <span class="detail-label">Resources:</span>
+                                        <span>${this.escapeHtml(record.resources.map(r => r.resource_identifier || r.resource_type || '').filter(Boolean).join(', '))}</span>
                                     </div>
                                 ` : ''}
                             </div>
@@ -372,7 +403,6 @@ class FixedVulnerabilitiesManager {
 
         this.historyContent.innerHTML = historyHtml;
     }
-
     closeHistoryModal() {
         this.historyModal.style.display = 'none';
     }
@@ -505,6 +535,17 @@ class FixedVulnerabilitiesManager {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     }
 
+    escapeAttribute(value) {
+        if (value === undefined || value === null) {
+            return '';
+        }
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -518,3 +559,6 @@ let fixedVulnManager;
 document.addEventListener('DOMContentLoaded', () => {
     fixedVulnManager = new FixedVulnerabilitiesManager();
 });
+
+
+
