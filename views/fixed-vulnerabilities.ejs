@@ -79,11 +79,27 @@
                         <label for="resourceType">Resource Type</label>
                         <select id="resourceType" name="resourceType">
                             <option value="">All Resource Types</option>
-                            <option value="EC2Instance">EC2 Instance</option>
-                            <option value="ECRContainerImage">ECR Container Image</option>
-                            <option value="ECRRepository">ECR Repository</option>
-                            <option value="LambdaFunction">Lambda Function</option>
+                            <% if (filterOptions && Array.isArray(filterOptions.resourceTypes)) { %>
+                                <% const resourceTypeLabels = {
+                                    AWS_EC2_INSTANCE: 'EC2 Instance',
+                                    AWS_ECR_CONTAINER_IMAGE: 'ECR Container Image',
+                                    AWS_ECR_REPOSITORY: 'ECR Repository',
+                                    AWS_LAMBDA_FUNCTION: 'Lambda Function'
+                                }; %>
+                                <% filterOptions.resourceTypes.forEach(type => { %>
+                                    <option value="<%= type %>">
+                                        <%= resourceTypeLabels[type] || type %>
+                                    </option>
+                                <% }) %>
+                            <% } %>
                         </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="resourceId">Resource ID</label>
+                        <input type="text" id="resourceId" name="resourceId"
+                               placeholder="e.g., i-0abc123def456789"
+                               title="Filter by specific resource identifier">
                     </div>
                 </div>
 

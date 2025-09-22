@@ -61,7 +61,9 @@ class Database {
     async getVulnerabilitiesByIds(ids = []) { return await this.call('getVulnerabilitiesByIds', ids); }
     async getVulnerabilitiesGroupedByCVE(filters = {}) { return await this.call('getVulnerabilitiesGroupedByCVE', filters); }
     async getFixedVulnerabilities(filters = {}) { return await this.call('getFixedVulnerabilities', filters); }
-    async getVulnerabilityTimeline(findingArn) { return await this.call('getVulnerabilityTimeline', findingArn); }
+    async getVulnerabilityTimeline(identifier, options = {}) {
+        return await this.call('getVulnerabilityTimeline', identifier, options);
+    }
     async insertVulnerability(...args) { return await this.call('insertVulnerability', ...args); }
     async insertResource(...args) { return await this.call('insertResource', ...args); }
     async insertPackage(...args) { return await this.call('insertPackage', ...args); }

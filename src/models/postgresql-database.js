@@ -886,6 +886,15 @@ class PostgreSQLDatabaseService {
                 params.push(filters.resourceType);
             }
 
+            if (filters.resourceId) {
+                conditions.push(`EXISTS (
+                    SELECT 1 FROM resource_history rh_filter
+                    WHERE rh_filter.vulnerability_history_id = h.id
+                      AND rh_filter.resource_identifier = $${paramIndex++}
+                )`);
+                params.push(filters.resourceId);
+            }
+
             let limitClause = '';
             if (filters.limit) {
                 limitClause = ` LIMIT $${paramIndex++}`;
@@ -991,6 +1000,13 @@ class PostgreSQLDatabaseService {
 
         const requestedLookup = options.lookupType;
         const lookupType = requestedLookup || (trimmedIdentifier.startsWith('arn:aws:inspector2:') ? 'findingArn' : 'vulnerabilityId');
+
+        const resourceIdFilter = typeof options.resourceId === 'string'
+            ? options.resourceId.trim() || null
+            : null;
+        const resourceTypeFilter = typeof options.resourceType === 'string'
+            ? options.resourceType.trim() || null
+            : null;
 
         let current = null;
         let vulnerabilityId = null;
@@ -1133,6 +1149,14 @@ class PostgreSQLDatabaseService {
             `, [historyIds]);
 
             for (const resource of resourceResult.rows) {
+                if (resourceTypeFilter && resource.resource_type !== resourceTypeFilter) {
+                    continue;
+                }
+
+                if (resourceIdFilter && resource.resource_identifier !== resourceIdFilter) {
+                    continue;
+                }
+
                 if (!resourceMap.has(resource.vulnerability_history_id)) {
                     resourceMap.set(resource.vulnerability_history_id, []);
                 }
@@ -1144,9 +1168,26 @@ class PostgreSQLDatabaseService {
             }
         }
 
-        const history = historyResult.rows.map(row => {
-            const resources = resourceMap.get(row.id) || [];
-            return {
+        const hadHistoricalRecords = historyResult.rows.length > 0;
+        const history = [];
+        for (const row of historyResult.rows) {
+            let resources = resourceMap.has(row.id)
+                ? [...resourceMap.get(row.id)]
+                : [];
+
+            if (resourceTypeFilter) {
+                resources = resources.filter(resource => resource.resource_type === resourceTypeFilter);
+            }
+
+            if (resourceIdFilter) {
+                resources = resources.filter(resource => resource.resource_identifier === resourceIdFilter);
+            }
+
+            if ((resourceTypeFilter || resourceIdFilter) && resources.length === 0) {
+                continue;
+            }
+
+            history.push({
                 id: row.id,
                 finding_arn: row.finding_arn,
                 vulnerability_id: row.vulnerability_id,
@@ -1166,12 +1207,12 @@ class PostgreSQLDatabaseService {
                 archived_at: row.archived_at,
                 resolution_type: row.resolution_type,
                 resources
-            };
-        });
+            });
+        }
 
         const currentStatus = current
             ? (current.status || 'ACTIVE').toUpperCase()
-            : (history.length ? 'FIXED' : 'UNKNOWN');
+            : (hadHistoricalRecords ? 'FIXED' : 'UNKNOWN');
 
         const resolvedFindingArn = findingArn
             || historyResult.rows[0]?.finding_arn

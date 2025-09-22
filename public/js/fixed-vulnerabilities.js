@@ -24,6 +24,7 @@ class FixedVulnerabilitiesManager {
         this.fixedAfterInput = document.getElementById('fixedAfter');
         this.fixedBeforeInput = document.getElementById('fixedBefore');
         this.resourceTypeSelect = document.getElementById('resourceType');
+        this.resourceIdInput = document.getElementById('resourceId');
 
         // Control elements
         this.clearFiltersBtn = document.getElementById('clearFilters');
@@ -110,7 +111,7 @@ class FixedVulnerabilitiesManager {
         });
 
         // Auto-save filters
-        ['severity', 'fixedAfter', 'fixedBefore', 'resourceType'].forEach(filterId => {
+        ['severity', 'fixedAfter', 'fixedBefore', 'resourceType', 'resourceId'].forEach(filterId => {
             const element = document.getElementById(filterId);
             element.addEventListener('change', () => {
                 this.saveFiltersToStorage();
@@ -129,6 +130,7 @@ class FixedVulnerabilitiesManager {
         this.fixedAfterInput.value = '';
         this.fixedBeforeInput.value = '';
         this.resourceTypeSelect.value = '';
+        this.resourceIdInput.value = '';
 
         this.currentPage = 1;
         this.loadData();
@@ -152,6 +154,10 @@ class FixedVulnerabilitiesManager {
 
         if (this.resourceTypeSelect.value) {
             filters.resourceType = this.resourceTypeSelect.value;
+        }
+
+        if (this.resourceIdInput.value) {
+            filters.resourceId = this.resourceIdInput.value.trim();
         }
 
         return filters;
@@ -306,6 +312,16 @@ class FixedVulnerabilitiesManager {
                 params.set('vulnerabilityId', normalizedVulnerabilityId);
             } else {
                 throw new Error('History lookup requires a finding ARN or vulnerability ID');
+            }
+
+            // Include resource ID filter if it's currently active
+            if (this.resourceIdInput && this.resourceIdInput.value) {
+                params.set('resourceId', this.resourceIdInput.value.trim());
+            }
+
+            // Include resource type filter when active so history respects current filters
+            if (this.resourceTypeSelect && this.resourceTypeSelect.value) {
+                params.set('resourceType', this.resourceTypeSelect.value);
             }
 
             const response = await fetch(`/api/vulnerability-history?${params.toString()}`);
@@ -474,7 +490,18 @@ class FixedVulnerabilitiesManager {
                 if (filters.severity) this.severitySelect.value = filters.severity;
                 if (filters.fixedAfter) this.fixedAfterInput.value = filters.fixedAfter;
                 if (filters.fixedBefore) this.fixedBeforeInput.value = filters.fixedBefore;
-                if (filters.resourceType) this.resourceTypeSelect.value = filters.resourceType;
+                if (filters.resourceType && this.resourceTypeSelect) {
+                    const optionExists = Array.from(this.resourceTypeSelect.options)
+                        .some(option => option.value === filters.resourceType);
+
+                    if (optionExists) {
+                        this.resourceTypeSelect.value = filters.resourceType;
+                    } else {
+                        delete filters.resourceType;
+                        localStorage.setItem('fixedVulnerabilityFilters', JSON.stringify(filters));
+                    }
+                }
+                if (filters.resourceId) this.resourceIdInput.value = filters.resourceId;
             }
         } catch (error) {
             console.warn('Failed to load filters from storage:', error);
@@ -559,6 +586,4 @@ let fixedVulnManager;
 document.addEventListener('DOMContentLoaded', () => {
     fixedVulnManager = new FixedVulnerabilitiesManager();
 });
-
-
 

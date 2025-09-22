@@ -484,6 +484,11 @@ app.get('/api/fixed-vulnerabilities', async (req, res) => {
             filters.resourceType = req.query.resourceType;
         }
 
+        // Resource ID filter
+        if (req.query.resourceId) {
+            filters.resourceId = req.query.resourceId;
+        }
+
         // Pagination
         const limit = parseInt(req.query.limit) || 50;
         const offset = parseInt(req.query.offset) || 0;
@@ -551,6 +556,15 @@ app.get('/api/vulnerability-history/:legacyFindingArn?', async (req, res) => {
                 message: 'History lookup requires a findingArn or vulnerabilityId parameter',
                 code: 'MISSING_IDENTIFIER'
             });
+        }
+
+        // Add resource ID filter if provided
+        if (req.query.resourceId) {
+            options.resourceId = req.query.resourceId;
+        }
+
+        if (req.query.resourceType) {
+            options.resourceType = req.query.resourceType;
         }
 
         if (options.lookupType === 'findingArn' && !identifier.startsWith('arn:aws:inspector2:')) {
