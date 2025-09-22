@@ -71,7 +71,7 @@ class Database {
     async insertVulnerabilities(vulnArray) { return await this.call('insertVulnerabilities', vulnArray); }
     async updateVulnerability(id, updates) { return await this.call('updateVulnerability', id, updates); }
     async deleteVulnerability(id) { return await this.call('deleteVulnerability', id); }
-    async archiveVulnerabilities(vulnerabilityIds) { return await this.call('archiveVulnerabilities', vulnerabilityIds); }
+    async archiveVulnerabilities(options = {}) { return await this.call('archiveVulnerabilities', options); }
 
     // Table management
     async clearCurrentTables() { return await this.call('clearCurrentTables'); }

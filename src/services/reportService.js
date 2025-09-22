@@ -44,7 +44,9 @@ class ReportService {
 
             // Step 3: Archive current vulnerabilities to history
             await uploadEvent.startArchiving();
-            const archivedCount = await this.historyService.archiveCurrentVulnerabilities(0); // Will get actual reportId later
+            const archivedCount = await this.historyService.archiveCurrentVulnerabilities(0, {
+                triggeredByUploadId: uploadEvent.uploadId
+            }); // Will get actual reportId later
             await uploadEvent.completeArchiving(archivedCount);
 
             // Step 4: Clear current tables

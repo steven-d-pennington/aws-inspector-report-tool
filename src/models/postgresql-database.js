@@ -764,19 +764,72 @@ class PostgreSQLDatabaseService {
         await this.query('DELETE FROM reports');
     }
 
-    async archiveVulnerabilities(reportId = 0) {
+    async archiveVulnerabilities(target = {}) {
         try {
-            // First, get count of current vulnerabilities to archive
-            const countResult = await this.query('SELECT COUNT(*) as count FROM vulnerabilities');
-            const archiveCount = parseInt(countResult.rows[0].count);
+            const options = Array.isArray(target)
+                ? { vulnerabilityIds: target }
+                : typeof target === 'number'
+                    ? { reportId: target }
+                    : (target || {});
+
+            const vulnerabilityIds = Array.isArray(options.vulnerabilityIds)
+                ? options.vulnerabilityIds
+                    .map(value => Number(value))
+                    .filter(Number.isFinite)
+                : null;
+
+            const reportId = typeof options.reportId === 'number' && options.reportId > 0
+                ? options.reportId
+                : null;
+
+            const triggeredByUploadId = options.triggeredByUploadId
+                || options.uploadId
+                || options.archivedByUploadId
+                || null;
+
+            const conditions = [];
+            const params = [];
+
+            if (vulnerabilityIds && vulnerabilityIds.length) {
+                conditions.push(`v.id = ANY($${params.length + 1}::int[])`);
+                params.push(vulnerabilityIds);
+            }
+
+            if (reportId) {
+                conditions.push(`v.report_id = $${params.length + 1}`);
+                params.push(reportId);
+            }
+
+            const whereClause = conditions.length ? conditions.join(' AND ') : '1=1';
+
+            const countResult = await this.query(
+                `SELECT COUNT(*) AS count FROM vulnerabilities v WHERE ${whereClause}`,
+                params
+            );
+            const archiveCount = parseInt(countResult.rows[0]?.count, 10) || 0;
+
+            const contextParts = [];
+            if (reportId) {
+                contextParts.push(`report ${reportId}`);
+            }
+            if (triggeredByUploadId) {
+                contextParts.push(`upload ${triggeredByUploadId}`);
+            }
+            if (vulnerabilityIds && vulnerabilityIds.length) {
+                contextParts.push(`${vulnerabilityIds.length} ids`);
+            }
+            const contextLabel = contextParts.length ? ` (${contextParts.join(', ')})` : '';
 
             if (archiveCount === 0) {
-                console.log('📊 No vulnerabilities to archive');
+                console.log(`No vulnerabilities to archive${contextLabel}`);
                 return 0;
             }
 
-            console.log(`📦 Archiving ${archiveCount} vulnerabilities to history...`);
-            // Archive vulnerabilities to history table (matching PostgreSQL schema)
+            console.log(`Archiving ${archiveCount} vulnerabilities to history${contextLabel}...`);
+
+            const uploadParamIndex = params.length + 1;
+            const insertParams = [...params, triggeredByUploadId];
+
             await this.query(`
                 INSERT INTO vulnerability_history (
                     original_vulnerability_id,
@@ -796,7 +849,12 @@ class PostgreSQLDatabaseService {
                     first_observed_at,
                     last_observed_at,
                     archived_date,
-                    resolution_type
+                    resolution_type,
+                    source_report_id,
+                    source_report_run_date,
+                    source_report_filename,
+                    source_report_uploaded_at,
+                    archived_by_upload_id
                 )
                 SELECT
                     v.id,
@@ -816,32 +874,60 @@ class PostgreSQLDatabaseService {
                     v.first_observed_at,
                     v.last_observed_at,
                     CURRENT_TIMESTAMP,
-                    'ARCHIVED'
+                    'ARCHIVED',
+                    r.id,
+                    r.report_run_date,
+                    r.filename,
+                    r.upload_date,
+                    $${uploadParamIndex}
                 FROM vulnerabilities v
-            `);
+                LEFT JOIN reports r ON r.id = v.report_id
+                WHERE ${whereClause}
+            `, insertParams);
 
+            const resourceUploadIndex = params.length + 1;
+            const resourceParams = [...params, triggeredByUploadId];
 
-            // Archive associated resources to resource_history table
             await this.query(`
-                INSERT INTO resource_history
-                (original_resource_id, vulnerability_history_id, resource_type,
-                 resource_identifier, region, archived_date)
+                INSERT INTO resource_history (
+                    original_resource_id,
+                    vulnerability_history_id,
+                    resource_type,
+                    resource_identifier,
+                    region,
+                    archived_date,
+                    source_report_id,
+                    archived_by_upload_id
+                )
                 SELECT
-                    r.id, h.id, r.resource_type, r.resource_id, r.region, CURRENT_TIMESTAMP
-                FROM resources r
-                JOIN vulnerabilities v ON v.id = r.vulnerability_id
+                    res.id,
+                    h.id,
+                    res.resource_type,
+                    COALESCE(res.resource_id, res.resource_arn),
+                    res.region,
+                    CURRENT_TIMESTAMP,
+                    h.source_report_id,
+                    $${resourceUploadIndex}
+                FROM resources res
+                JOIN vulnerabilities v ON v.id = res.vulnerability_id
                 JOIN vulnerability_history h ON h.original_vulnerability_id = v.id
-                WHERE h.archived_date >= CURRENT_TIMESTAMP - INTERVAL '1 minute'
-            `);
+                WHERE ${whereClause}
+                  AND (
+                    ($${resourceUploadIndex}::uuid IS NOT NULL AND h.archived_by_upload_id = $${resourceUploadIndex})
+                    OR ($${resourceUploadIndex}::uuid IS NULL AND h.archived_date >= CURRENT_TIMESTAMP - INTERVAL '1 minute')
+                  )
+            `, resourceParams);
 
-            console.log(`✅ Successfully archived ${archiveCount} vulnerabilities to history`);
+            console.log(`Archived ${archiveCount} vulnerabilities to history${contextLabel}`);
             return archiveCount;
 
         } catch (error) {
-            console.error('❌ Failed to archive vulnerabilities:', error);
+            console.error('Failed to archive vulnerabilities:', error);
             throw error;
         }
     }
+
+
 
     async getVulnerabilityStatistics() {
         const summary = await this.getSummary();
@@ -928,6 +1014,11 @@ class PostgreSQLDatabaseService {
                         h.inspector_score,
                         h.epss_score,
                         h.exploit_available,
+                        h.source_report_id,
+                        h.source_report_run_date,
+                        h.source_report_filename,
+                        h.source_report_uploaded_at,
+                        h.archived_by_upload_id,
                         GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (h.archived_date - COALESCE(h.first_observed_at, h.archived_date))) / 86400))::int AS days_active
                     FROM vulnerability_history h
                     WHERE NOT EXISTS (
@@ -957,6 +1048,11 @@ class PostgreSQLDatabaseService {
                     b.inspector_score,
                     b.epss_score,
                     b.exploit_available,
+                    b.source_report_id,
+                    b.source_report_run_date,
+                    b.source_report_filename,
+                    b.source_report_uploaded_at,
+                    b.archived_by_upload_id,
                     b.days_active,
                     COALESCE(string_agg(DISTINCT rh.resource_identifier, ','), '') AS affected_resources,
                     COALESCE(string_agg(DISTINCT rh.resource_type, ','), '') AS resource_types
@@ -965,7 +1061,8 @@ class PostgreSQLDatabaseService {
                 GROUP BY b.id, b.finding_arn, b.vulnerability_id, b.aws_account_id, b.title, b.severity, b.status,
                          b.package_name, b.package_version, b.fix_version, b.first_observed_at, b.last_observed_at,
                          b.fixed_date, b.resolution_type, b.fix_available, b.inspector_score, b.epss_score,
-                         b.exploit_available, b.days_active
+                         b.exploit_available, b.source_report_id, b.source_report_run_date, b.source_report_filename,
+                         b.source_report_uploaded_at, b.archived_by_upload_id, b.days_active
                 ORDER BY b.fixed_date DESC, b.severity DESC
                 ${limitClause}${offsetClause}
             `;
@@ -1122,7 +1219,12 @@ class PostgreSQLDatabaseService {
                 h.first_observed_at,
                 h.last_observed_at,
                 h.archived_date AS archived_at,
-                h.resolution_type
+                h.resolution_type,
+                h.source_report_id,
+                h.source_report_run_date,
+                h.source_report_filename,
+                h.source_report_uploaded_at,
+                h.archived_by_upload_id
             FROM vulnerability_history h
             WHERE ${historyWhereClause}
             ORDER BY h.archived_date DESC
@@ -1143,7 +1245,10 @@ class PostgreSQLDatabaseService {
                     vulnerability_history_id,
                     resource_type,
                     resource_identifier,
-                    region
+                    region,
+                    source_report_id,
+                    archived_by_upload_id,
+                    archived_date
                 FROM resource_history
                 WHERE vulnerability_history_id = ANY($1::int[])
             `, [historyIds]);
@@ -1163,7 +1268,10 @@ class PostgreSQLDatabaseService {
                 resourceMap.get(resource.vulnerability_history_id).push({
                     resource_type: resource.resource_type,
                     resource_identifier: resource.resource_identifier,
-                    region: resource.region
+                    region: resource.region,
+                    source_report_id: resource.source_report_id,
+                    archived_by_upload_id: resource.archived_by_upload_id,
+                    archived_at: resource.archived_date
                 });
             }
         }
@@ -1206,6 +1314,11 @@ class PostgreSQLDatabaseService {
                 last_observed_at: row.last_observed_at,
                 archived_at: row.archived_at,
                 resolution_type: row.resolution_type,
+                source_report_id: row.source_report_id,
+                source_report_run_date: row.source_report_run_date,
+                source_report_filename: row.source_report_filename,
+                source_report_uploaded_at: row.source_report_uploaded_at,
+                archived_by_upload_id: row.archived_by_upload_id,
                 resources
             });
         }

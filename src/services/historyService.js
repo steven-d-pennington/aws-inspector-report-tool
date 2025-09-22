@@ -18,9 +18,13 @@ class HistoryService {
      * This is the first step in the upload workflow
      *
      * @param {number} reportId - Report ID that vulnerabilities will be archived from
+     * @param {object} [options] - Additional archive options
+     * @param {string} [options.triggeredByUploadId] - Upload identifier that initiated the archive
+     * @param {number[]} [options.vulnerabilityIds] - Explicit vulnerability ids to archive
      * @returns {Promise<number>} Count of vulnerabilities archived
      */
-    async archiveCurrentVulnerabilities(reportId) {
+    async archiveCurrentVulnerabilities(reportId, options = {}) {
+        const { triggeredByUploadId = null, vulnerabilityIds = null } = options || {};
         try {
             console.log(`Archiving current vulnerabilities from report ${reportId}...`);
 
