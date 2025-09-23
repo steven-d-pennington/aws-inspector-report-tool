@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      - codex/add-bulk-file-operations-to-upload-page
+  workflow_dispatch:
 jobs:
   deploy:
     name: Deploy app
