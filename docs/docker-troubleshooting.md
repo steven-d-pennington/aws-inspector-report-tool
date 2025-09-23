@@ -1,5 +1,5 @@
 # Docker Troubleshooting Guide
-
+text
 This guide helps resolve common issues when running the AWS Inspector Report Tool in Docker containers.
 
 ## Common Issues
