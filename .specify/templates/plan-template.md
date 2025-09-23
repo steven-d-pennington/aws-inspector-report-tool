@@ -18,7 +18,7 @@
    → Update Progress Tracking: Initial Constitution Check
 5. Execute Phase 0 → research.md
    → If NEEDS CLARIFICATION remain: ERROR "Resolve unknowns"
-6. Execute Phase 1 → contracts, data-model.md, quickstart.md, agent-specific template file (e.g., `CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot, `GEMINI.md` for Gemini CLI, or `QWEN.md` for Qwen Code).
+6. Execute Phase 1 → contracts, data-model.md, quickstart.md, agent-specific template file (e.g., `CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot, `GEMINI.md` for Gemini CLI, `QWEN.md` for Qwen Code or `AGENTS.md` for opencode).
 7. Re-evaluate Constitution Check section
    → If new violations: Refactor design, return to Phase 1
    → Update Progress Tracking: Post-Design Constitution Check
@@ -47,7 +47,11 @@
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Security-First Vulnerability Handling - Confirm auth boundaries, secret handling, and anonymised fixtures.
+- [ ] Source-of-Truth Integrity - Detail how raw uploads stay canonical and how migrations and audit trails will be handled.
+- [ ] Tests Before Delivery - List the contract, integration, and regression tests that will exist before implementation starts.
+- [ ] Observability & Incident Readiness - Identify required logging, metrics, health checks, and runbook updates.
+- [ ] Deployment Parity & Change Control - Explain docker or compose updates, environment variables, migrations, and rollout safeguards.
 
 ## Project Structure
 
@@ -145,7 +149,8 @@ ios/ or android/
    - Quickstart test = story validation steps
 
 5. **Update agent file incrementally** (O(1) operation):
-   - Run `.specify/scripts/powershell/update-agent-context.ps1 -AgentType claude` for your AI assistant
+   - Run `.specify/scripts/powershell/update-agent-context.ps1 -AgentType codex`
+     **IMPORTANT**: Execute it exactly as specified above. Do not add or remove any arguments.
    - If exists: Add only NEW tech from current plan
    - Preserve manual additions between markers
    - Update recent changes (keep last 3)
@@ -158,17 +163,18 @@ ios/ or android/
 *This section describes what the /tasks command will do - DO NOT execute during /plan*
 
 **Task Generation Strategy**:
-- Load `.specify/templates/tasks-template.md` as base
-- Generate tasks from Phase 1 design docs (contracts, data model, quickstart)
-- Each contract → contract test task [P]
-- Each entity → model creation task [P] 
-- Each user story → integration test task
-- Implementation tasks to make tests pass
+- Load `.specify/templates/tasks-template.md` as base.
+- Use contracts, data-model, and quickstart artifacts to enumerate setup, tests, core, observability, and deployment parity work.
+- For each contract: create contract test tasks before implementation.
+- For each entity: outline migrations or model work and the services they drive.
+- For each user story or quickstart path: define integration tests and validation steps.
+- Record logging, metrics, runbooks, and change-control obligations surfaced during planning.
+
 
 **Ordering Strategy**:
-- TDD order: Tests before implementation 
-- Dependency order: Models before services before UI
-- Mark [P] for parallel execution (independent files)
+- TDD order: Tests before implementation
+- Sequence: Setup -> Tests -> Core services -> Observability -> Deployment parity -> Documentation
+- Mark [P] for parallel execution when tasks touch independent files and do not break constitutional gates.
 
 **Estimated Output**: 25-30 numbered, ordered tasks in tasks.md
 
@@ -208,4 +214,4 @@ ios/ or android/
 - [ ] Complexity deviations documented
 
 ---
-*Based on Constitution v2.1.1 - See `/memory/constitution.md`*
+*Based on Constitution v3.0.0 - See `/memory/constitution.md`*

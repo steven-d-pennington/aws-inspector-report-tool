@@ -2,6 +2,12 @@
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 ---
 
+The user input to you can be provided directly by the agent or as a command argument - you **MUST** consider it before proceeding with the prompt (if not empty).
+
+User input:
+
+$ARGUMENTS
+
 Given the implementation details provided as an argument, do this:
 
 1. Run `.specify/scripts/powershell/setup-plan.ps1 -Json` from the repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. All future file paths must be absolute.
@@ -25,15 +31,12 @@ Given the implementation details provided as an argument, do this:
      * Phase 2 generates tasks.md
    - Incorporate user-provided details from arguments into Technical Context: $ARGUMENTS
    - Update Progress Tracking as you complete each phase
-   - Document Constitution Check entries for security, source-of-truth integrity, tests-before-delivery, observability, and deployment parity
 
 5. Verify execution completed:
    - Check Progress Tracking shows all phases complete
-   - Ensure Constitution Check items are marked PASS with supporting notes in the plan
    - Ensure all required artifacts were generated
    - Confirm no ERROR states in execution
 
 6. Report results with branch name, file paths, and generated artifacts.
 
 Use absolute paths with the repository root for all file operations to avoid path issues.
-

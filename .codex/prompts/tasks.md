@@ -2,15 +2,19 @@
 description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
 ---
 
-Given the context provided as an argument, do this:
+The user input to you can be provided directly by the agent or as a command argument - you **MUST** consider it before proceeding with the prompt (if not empty).
 
-1. Run `.specify/scripts/powershell/check-task-prerequisites.ps1 -Json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute.
+User input:
+
+$ARGUMENTS
+
+1. Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute.
 2. Load and analyze available design documents:
-   - Always read plan.md for tech stack, libraries, and noted constitutional obligations
-   - IF EXISTS: Read data-model.md for entities and relationships
+   - Always read plan.md for tech stack and libraries
+   - IF EXISTS: Read data-model.md for entities
    - IF EXISTS: Read contracts/ for API endpoints
    - IF EXISTS: Read research.md for technical decisions
-   - IF EXISTS: Read quickstart.md for test scenarios and regression flows
+   - IF EXISTS: Read quickstart.md for test scenarios
 
    Note: Not all projects have all documents. For example:
    - CLI tools might not have contracts/
@@ -20,27 +24,27 @@ Given the context provided as an argument, do this:
 3. Generate tasks following the template:
    - Use `.specify/templates/tasks-template.md` as the base
    - Replace example tasks with actual tasks based on:
-     * **Setup tasks**: Environment prep, dependencies, secrets hygiene
-     * **Test tasks [P]**: Contract tests per endpoint, integration tests per user story
-     * **Core tasks**: Parsing, persistence, filtering, exports, UI updates
-     * **Observability tasks**: Logging, metrics, alerting, runbooks
-     * **Deployment parity tasks**: Migrations, docker or compose updates, configuration sync
+     * **Setup tasks**: Project init, dependencies, linting
+     * **Test tasks [P]**: One per contract, one per integration scenario
+     * **Core tasks**: One per entity, service, CLI command, endpoint
+     * **Integration tasks**: DB connections, middleware, logging
+     * **Polish tasks [P]**: Unit tests, performance, docs
 
 4. Task generation rules:
-   - Each contract file -> contract test task marked [P]
-   - Each entity in data-model -> migration or model task marked [P]
-   - Each endpoint -> controller/service implementation task (not parallel if shared files)
-   - Each user story -> integration test marked [P]
-   - Capture observability and deployment parity obligations highlighted in plan.md
+   - Each contract file → contract test task marked [P]
+   - Each entity in data-model → model creation task marked [P]
+   - Each endpoint → implementation task (not parallel if shared files)
+   - Each user story → integration test marked [P]
    - Different files = can be parallel [P]
    - Same file = sequential (no [P])
 
 5. Order tasks by dependencies:
    - Setup before everything
    - Tests before implementation (TDD)
-   - Core services before observability wiring
-   - Observability before deployment parity and documentation
-   - Deployment parity before final verification or polish
+   - Models before services
+   - Services before endpoints
+   - Core before integration
+   - Everything before polish
 
 6. Include parallel execution examples:
    - Group [P] tasks that can run together
@@ -56,4 +60,3 @@ Given the context provided as an argument, do this:
 Context for task generation: $ARGUMENTS
 
 The tasks.md should be immediately executable - each task must be specific enough that an LLM can complete it without additional context.
-

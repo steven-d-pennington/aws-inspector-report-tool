@@ -8,29 +8,31 @@
 ## Execution Flow (main)
 ```
 1. Parse user description from Input
-   → If empty: ERROR "No feature description provided"
+   - If empty: ERROR "No feature description provided"
 2. Extract key concepts from description
-   → Identify: actors, actions, data, constraints
+   - Identify: actors, actions, data, constraints
 3. For each unclear aspect:
-   → Mark with [NEEDS CLARIFICATION: specific question]
+   - Mark with [NEEDS CLARIFICATION: specific question]
 4. Fill User Scenarios & Testing section
-   → If no clear user flow: ERROR "Cannot determine user scenarios"
+   - If no clear user flow: ERROR "Cannot determine user scenarios"
 5. Generate Functional Requirements
-   → Each requirement must be testable
-   → Mark ambiguous requirements
+   - Each requirement must be testable
+   - Mark ambiguous requirements
 6. Identify Key Entities (if data involved)
 7. Run Review Checklist
-   → If any [NEEDS CLARIFICATION]: WARN "Spec has uncertainties"
-   → If implementation details found: ERROR "Remove tech details"
+   - If any [NEEDS CLARIFICATION]: WARN "Spec has uncertainties"
+   - If implementation details found: ERROR "Remove tech details"
 8. Return: SUCCESS (spec ready for planning)
 ```
 
 ---
 
-## ⚡ Quick Guidelines
-- ✅ Focus on WHAT users need and WHY
-- ❌ Avoid HOW to implement (no tech stack, APIs, code structure)
-- 👥 Written for business stakeholders, not developers
+## Quick Guidelines
+- Focus on what security teams and analysts must accomplish and why the feature matters.
+- Call out constitution-driven constraints (security, data integrity, observability) that shape the scope.
+- Keep implementation details out of the spec; technology decisions belong in the plan.
+- Highlight ambiguities or gaps that could weaken risk reporting or expose sensitive data.
+- Write for business and security stakeholders using measurable outcomes.
 
 ### Section Requirements
 - **Mandatory sections**: Must be completed for every feature
@@ -68,15 +70,15 @@ When creating this spec from a user prompt:
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
-- **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
-- **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
-- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
-- **FR-005**: System MUST [behavior, e.g., "log all security events"]
+- **FR-001**: System MUST allow analysts to upload AWS Inspector JSON reports via the dashboard.
+- **FR-002**: System MUST persist parsed findings to PostgreSQL with the original payload metadata.
+- **FR-003**: Users MUST be able to filter findings by severity, status, resource, fix availability, and full-text search.
+- **FR-004**: System MUST export selected findings to PDF and Markdown with consistent formatting.
+- **FR-005**: System MUST log ingestion, export, and sanitisation outcomes for observability dashboards.
 
 *Example of marking unclear requirements:*
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-006**: System MUST enforce [NEEDS CLARIFICATION: authentication or authorisation approach not specified].
+- **FR-007**: System MUST retain uploaded reports for [NEEDS CLARIFICATION: retention period or deletion policy not specified].
 
 ### Key Entities *(include if feature involves data)*
 - **[Entity 1]**: [What it represents, key attributes without implementation]
@@ -114,3 +116,4 @@ When creating this spec from a user prompt:
 - [ ] Review checklist passed
 
 ---
+

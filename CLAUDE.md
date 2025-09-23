@@ -1,4 +1,4 @@
-﻿# vulnerability-dashboard Development Guidelines
+# vulnerability-dashboard Development Guidelines
 
 Auto-generated from all feature plans. Last updated: 2025-09-20
 
@@ -25,9 +25,6 @@ Node.js (JavaScript ES6+): Follow standard conventions
 - 001-add-a-filter: Added Node.js (JavaScript ES6+) + Express.js, EJS, PostgreSQL, vanilla JavaScript
 
 <!-- MANUAL ADDITIONS START -->
+- Constitution v3.0.0 priorities: security-first ingestion, source-of-truth integrity, tests-before-delivery, observability runbooks, deployment parity change control.
+- Reference `.specify/memory/constitution.md` in PR descriptions and record evidence (tests, migrations, logs) before requesting review.
 <!-- MANUAL ADDITIONS END -->
-
-
-
-
-

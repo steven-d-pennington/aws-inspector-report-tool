@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.117",
+    "@openai/codex": "^0.39.0",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.2",
     "ejs": "^3.1.9",
