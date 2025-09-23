@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - codex/add-bulk-file-operations-to-upload-page-7x3flu
+      - codex/add-bulk-file-operations-to-upload-page
 jobs:
   deploy:
     name: Deploy app
