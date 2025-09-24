@@ -17,17 +17,47 @@ require('dotenv').config({ path: path.join(process.cwd(), '.env') });
 const environmentConfig = require('../src/config/environment');
 
 function resolveConnectionOptions() {
-  const connectionString =
+  let connectionString =
     process.env.DATABASE_URL ||
     process.env.DB_URL ||
-    process.env.PG_CONNECTION_STRING ||
-    environmentConfig.getDatabaseConnectionString();
+    process.env.PG_CONNECTION_STRING;
+
+  if (!connectionString) {
+    const {
+      PGHOST,
+      PGPORT,
+      PGUSER,
+      PGPASSWORD,
+      PGDATABASE,
+      PGSSLMODE
+    } = process.env;
+
+    const hasPgEnv = PGHOST && PGUSER && PGDATABASE;
+
+    if (hasPgEnv) {
+      const encodedUser = encodeURIComponent(PGUSER);
+      const encodedPassword = PGPASSWORD ? `:${encodeURIComponent(PGPASSWORD)}` : '';
+      const port = PGPORT || '5432';
+      const sslMode = (PGSSLMODE || process.env.DB_SSL_MODE || '').toLowerCase();
+      const sslParam =
+        sslMode === 'require' || sslMode === 'prefer'
+          ? 'sslmode=require'
+          : sslMode === 'disable'
+            ? 'sslmode=disable'
+            : '';
+
+      const querySuffix = sslParam ? `?${sslParam}` : '';
+      connectionString = `postgresql://${encodedUser}${encodedPassword}@${PGHOST}:${port}/${PGDATABASE}${querySuffix}`;
+    }
+  }
+
+  connectionString = connectionString || environmentConfig.getDatabaseConnectionString();
 
   if (!connectionString) {
     throw new Error('DATABASE_URL (or equivalent) is required for migrations');
   }
 
-  const sslMode = (process.env.DB_SSL_MODE || '').toLowerCase();
+  const sslMode = (process.env.DB_SSL_MODE || process.env.PGSSLMODE || '').toLowerCase();
   let ssl;
   if (sslMode === 'require') {
     ssl = { rejectUnauthorized: false };
